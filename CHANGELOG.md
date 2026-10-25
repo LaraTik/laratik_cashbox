@@ -20,6 +20,25 @@ only re-verify their schema.
 
 ---
 
+## 0.1.3 — 2026-10-25
+
+The fourth release, and the one where the image actually says what it is.
+
+### Changed
+
+- **The build commit reaches the RUNNER stage.** A Docker build ARG belongs
+  to the stage that declares it, and the first attempt declared it in the
+  BUILDER stage — where it does not travel to the final image. The readiness
+  probe kept answering `build.commit: null` for exactly that reason. The ARG
+  is now declared where the image ships.
+- The version is `0.1.3` in both halves.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.2 — 2026-10-25
 
 The third release, and the first one whose image can say what it is.
