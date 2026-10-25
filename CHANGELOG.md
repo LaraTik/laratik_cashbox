@@ -20,6 +20,42 @@ only re-verify their schema.
 
 ---
 
+## 0.1.1 — 2026-10-25
+
+The second release, and the first one cut through the release machinery
+end to end: the version bumped in both halves, the distributable repository
+regenerated and tagged, the image built and published, the bench upgraded in
+place, and the migration re-run.
+
+### Changed
+
+- The version is `0.1.1` in both halves. They move together because the web
+  app's schema corpus is GENERATED from this app's tree, so a release that
+  bumped one and not the other would ship a UI reading a schema it was not
+  built against.
+- The **web app** changed: the Desk's address is configuration rather than a
+  literal, the app is served from the apex, and the health check is the
+  READINESS probe (`/api/health/ready`) instead of the liveness one.
+- The **app** itself did not change: no DocType, no patch, no schema. The
+  version moved because the product moved, and because the two halves carry
+  one version.
+
+### Patches
+
+None. This version changes no schema, so `bench migrate` has nothing to run
+beyond the usual re-verification — which is exactly what the changelog is
+for: a reader knows before upgrading whether the migration will touch their
+data.
+
+### Verified against
+
+The distributable tree is byte-for-byte the published release (every file
+checked against `DISTRIBUTION.json`), the bench was **recreated from
+scratch** with the app mounted and still imported it, and the site migrated
+and served the app against ERPNext 16.31.0.
+
+---
+
 ## 0.1.0 — 2026-10-25
 
 The first distributable release. Nothing here is a change from a previous
