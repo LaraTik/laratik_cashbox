@@ -1,0 +1,77 @@
+{
+ "actions": [],
+ "allow_copy": 0,
+ "allow_rename": 1,
+ "creation": "2026-10-22 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "party",
+  "amount",
+  "currency",
+  "entry",
+  "due_date",
+  "status"
+ ],
+ "fields": [
+  {
+   "description": "WHO owes this. A party is a ROW, not a column on the box: the previous model had one column per named person, so adding a fifth person was a schema change. Here it is data.",
+   "fieldname": "party",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Party",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1,
+   "description": "The currency this obligation is in. The roster's amounts are the box's money, so a row in another currency is refused by the rollup, not converted (ADR-170)."
+  },
+  {
+   "description": "The entry that created this obligation. An obligation is ONE row that changes state when it is settled \u2014 not a second row for the payment.",
+   "fieldname": "entry",
+   "fieldtype": "Link",
+   "label": "Entry",
+   "options": "LaraTik Cash Box Entry",
+   "reqd": 1
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date"
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Open\nSettled",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LaraTik Cashbox",
+ "name": "LaraTik Cash Box Pending",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

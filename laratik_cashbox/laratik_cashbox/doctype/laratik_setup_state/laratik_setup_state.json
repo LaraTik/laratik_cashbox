@@ -1,0 +1,57 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "allow_copy": 0,
+ "creation": "2026-10-24 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "status",
+  "setup_json"
+ ],
+ "fields": [
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Setup Status",
+   "options": "Not Started\nIn Progress",
+   "default": "Not Started",
+   "read_only": 1
+  },
+  {
+   "fieldname": "setup_json",
+   "fieldtype": "Long Text",
+   "label": "Setup Draft JSON"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-10-24 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LaraTik Cashbox",
+ "name": "LaraTik Setup State",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "System Manager",
+   "share": 0,
+   "write": 1,
+   "amend": 0,
+   "bulk_delete": 0,
+   "cancel": 0,
+   "submit": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,199 @@
+{
+ "actions": [],
+ "allow_copy": 0,
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-10-21 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "cash_account",
+  "opening_date",
+  "box_type",
+  "display_name",
+  "related_client",
+  "holder_name",
+  "custodian",
+  "status",
+  "balance_rule",
+  "balance_role",
+  "current_balance",
+  "total_received",
+  "total_distributed",
+  "total_outstanding",
+  "total_cash",
+  "last_activity",
+  "entries",
+  "pending_items"
+ ],
+ "fields": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Employee",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cash_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Cash Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "opening_date",
+   "fieldtype": "Date",
+   "label": "Opening Date",
+   "reqd": 1
+  },
+  {
+   "default": "Employee",
+   "fieldname": "box_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Box Type",
+   "options": "Employee\nClient\nVendor",
+   "reqd": 1
+  },
+  {
+   "fieldname": "display_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Display Name"
+  },
+  {
+   "fieldname": "related_client",
+   "fieldtype": "Data",
+   "label": "Related Client"
+  },
+  {
+   "fieldname": "holder_name",
+   "fieldtype": "Data",
+   "label": "Holder Name"
+  },
+  {
+   "fieldname": "custodian",
+   "fieldtype": "Data",
+   "label": "Custodian"
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nInactive\nArchived",
+   "reqd": 1
+  },
+  {
+   "default": "Outstanding",
+   "description": "Which definition of `current_balance` applies to this box.\n\n  \u2022 Outstanding \u2014 `total_outstanding` (issued + loan given \u2212 loan repaid). The right rule for every box except the company's main cash box.\n  \u2022 Received minus distributed \u2014 `total_received` \u2212 `total_distributed`. Cash on hand. The right rule for the MAIN cash box.\n\nThe default is `Outstanding`, because it is the only default that cannot change a figure somebody already has.",
+   "fieldname": "balance_rule",
+   "fieldtype": "Select",
+   "label": "Balance Rule",
+   "options": "Outstanding\nReceived minus distributed",
+   "reqd": 1
+  },
+  {
+   "default": "Custody",
+   "description": "Which role this box has for its linked Account's company. Main is declared per company; Custody is the safe default. The company is resolved through cash_account → Account.company.",
+   "fieldname": "balance_role",
+   "fieldtype": "Select",
+   "label": "Balance Role",
+   "options": "Main\nCustody",
+   "reqd": 1
+  },
+  {
+   "fieldname": "current_balance",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Current Balance",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_received",
+   "fieldtype": "Currency",
+   "label": "Total Received",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_distributed",
+   "fieldtype": "Currency",
+   "label": "Total Distributed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_outstanding",
+   "fieldtype": "Currency",
+   "label": "Total Outstanding",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_cash",
+   "fieldtype": "Currency",
+   "label": "Total Cash",
+   "read_only": 1,
+   "description": "The cash that actually moved through this box: received + transfers in - distributed - transfers out. It is computed for EVERY box, whatever `balance_rule` says, because the reconciliation signal is this figure against the GL balance of `cash_account` - and those are different facts (ADR-170). `current_balance` is the rule-selected figure and is not the same thing."
+  },
+  {
+   "fieldname": "last_activity",
+   "fieldtype": "Datetime",
+   "label": "Last Activity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "entries",
+   "fieldtype": "Table",
+   "label": "Entries",
+   "options": "LaraTik Cash Box Entry",
+   "description": "ONE ledger. The transfer table is gone: a transfer is an entry whose `other_box` is set, because it moves custody between two boxes, which is a counterparty fact and not a different kind of row (ADR-169)."
+  },
+  {
+   "fieldname": "pending_items",
+   "fieldtype": "Table",
+   "label": "Pending Items",
+   "options": "LaraTik Cash Box Pending",
+   "description": "What is OWED, one row per obligation. The four `pending_*` columns this replaces held one amount per named person, so adding a fifth person was a schema change; here a party is a row (ADR-169)."
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LaraTik Cashbox",
+ "name": "LaraTik Cash Box",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 0,
+   "bulk_delete": 0,
+   "cancel": 0,
+   "create": 1,
+   "delete": 1,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "System Manager",
+   "share": 0,
+   "submit": 0,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "display_name"
+}

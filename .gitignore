@@ -1,0 +1,12 @@
+# Python bytecode. A bench run compiles the app's modules on import, and
+# those artefacts are build output, not source.
+__pycache__/
+*.py[cod]
+
+# Frappe's own scratch files, when the app is run in place.
+*.pyc
+node_modules/
+
+# macOS folder metadata. The repository root already tracks a few of these;
+# new ones must not be added.
+.DS_Store

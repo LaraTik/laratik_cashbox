@@ -1,0 +1,191 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "allow_copy": 0,
+ "creation": "2026-10-21 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "company",
+  "scope_owner",
+  "source_doctype",
+  "source_name",
+  "content",
+  "content_format",
+  "content_hash",
+  "occurred_on",
+  "metadata",
+  "access_scope",
+  "status",
+  "index_error",
+  "document_key",
+  "version",
+  "supersedes",
+  "mime_type",
+  "byte_size",
+  "original_filename"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Data",
+   "label": "Company",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "scope_owner",
+   "fieldtype": "Data",
+   "label": "Scope Owner",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "source_doctype",
+   "fieldtype": "Data",
+   "label": "Source DocType"
+  },
+  {
+   "fieldname": "source_name",
+   "fieldtype": "Data",
+   "label": "Source Name"
+  },
+  {
+   "fieldname": "content",
+   "fieldtype": "Long Text",
+   "label": "Content",
+   "reqd": 1
+  },
+  {
+   "fieldname": "content_format",
+   "fieldtype": "Select",
+   "label": "Content Format",
+   "options": "Plain\nMarkdown\nJSON",
+   "default": "Plain"
+  },
+  {
+   "fieldname": "content_hash",
+   "fieldtype": "Data",
+   "label": "Content Hash",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "occurred_on",
+   "fieldtype": "Datetime",
+   "label": "Occurred On"
+  },
+  {
+   "fieldname": "metadata",
+   "fieldtype": "Long Text",
+   "label": "Metadata"
+  },
+  {
+   "fieldname": "access_scope",
+   "fieldtype": "Select",
+   "label": "Access Scope",
+   "options": "Owner\nCompany",
+   "reqd": 1,
+   "read_only": 0,
+   "search_index": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "pending\nindexing\nindexed\nfailed\nsuperseded\nrevoked",
+   "reqd": 1,
+   "read_only": 0
+  },
+  {
+   "fieldname": "index_error",
+   "fieldtype": "Long Text",
+   "label": "Index Error",
+   "reqd": 0,
+   "read_only": 0
+  },
+  {
+   "fieldname": "document_key",
+   "fieldtype": "Data",
+   "label": "Document Key",
+   "reqd": 0,
+   "read_only": 0
+  },
+  {
+   "fieldname": "version",
+   "fieldtype": "Int",
+   "label": "Version",
+   "reqd": 0,
+   "read_only": 0
+  },
+  {
+   "fieldname": "supersedes",
+   "fieldtype": "Data",
+   "label": "Supersedes",
+   "reqd": 0,
+   "read_only": 0
+  },
+  {
+   "fieldname": "mime_type",
+   "fieldtype": "Data",
+   "label": "Mime Type",
+   "reqd": 0,
+   "read_only": 0
+  },
+  {
+   "fieldname": "byte_size",
+   "fieldtype": "Int",
+   "label": "Byte Size",
+   "reqd": 0,
+   "read_only": 0
+  },
+  {
+   "fieldname": "original_filename",
+   "fieldtype": "Data",
+   "label": "Original Filename",
+   "reqd": 0,
+   "read_only": 0
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LaraTik Cashbox",
+ "name": "LaraTik Artifact",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "System Manager",
+   "share": 0,
+   "write": 1,
+   "amend": 0,
+   "bulk_delete": 0,
+   "cancel": 0,
+   "submit": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "hash",
+ "title_field": "title"
+}

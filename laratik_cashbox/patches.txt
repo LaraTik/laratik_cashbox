@@ -1,0 +1,45 @@
+# Upgrade order for laratik_cashbox.
+#
+# ONE LINE PER DOCTYPE, in dependency order, so that `bench migrate` is
+# repeatable and the order is legible rather than implied by the filesystem.
+#
+# WHY `[post_model_sync]` AND NOT `[pre_model_sync]`
+#
+# The schema reaches the site through the DocType sync that `bench migrate`
+# performs. A patch that ran BEFORE that sync would be checking the schema
+# the site is about to have, not the schema it has. `[post_model_sync]` runs
+# after, so the check is against reality.
+#
+# WHY THE CHILDREN COME FIRST
+#
+# `LaraTik Cash Box`'s Table fields name `LaraTik Cash Box Entry` and `LaraTik Cash Box
+# Pending`, and a Table field's target has to exist when the parent is
+# imported. `LaraTik Cash Box Entry.other_box` links back to `LaraTik Cash Box`, so the
+# pair is mutually referential; that resolves because Frappe resolves a Link
+# target when a DOCUMENT is written, not when a doctype is imported.
+#
+# WHAT PATCHES HERE DO
+#
+# The ensure_doctypes checks read the site's live meta and repository JSON,
+# then fail migration if they disagree. The cash_movement_workflow patch is
+# intentionally different: it ensures the referenced Workflow State masters,
+# then creates or verifies the named Frappe Workflow. DocType schema still
+# comes only from model sync; the workflow patch checks that workflow_state
+# matches Frappe v16 before creating these setup records.
+
+[pre_model_sync]
+
+[post_model_sync]
+laratik_cashbox.patches.v1_0.ensure_laratik_cash_movement
+laratik_cashbox.patches.v1_0.install_cash_movement_workflow
+laratik_cashbox.patches.v1_0.ensure_laratik_cash_box_entry
+laratik_cashbox.patches.v1_0.ensure_laratik_cash_box_pending
+laratik_cashbox.patches.v1_0.ensure_laratik_cash_box
+laratik_cashbox.patches.v1_0.backfill_cash_box_balance_role
+laratik_cashbox.patches.v1_0.ensure_laratik_collection
+laratik_cashbox.patches.v1_0.ensure_laratik_item
+laratik_cashbox.patches.v1_0.ensure_laratik_metric
+laratik_cashbox.patches.v1_0.ensure_laratik_artifact
+laratik_cashbox.patches.v1_0.ensure_laratik_index_entry
+laratik_cashbox.patches.v1_0.backfill_laratik_cash_box_balances
+laratik_cashbox.patches.v1_0.verify_setup_state

@@ -1,0 +1,65 @@
+[project]
+name = "laratik_cashbox"
+authors = [
+    { name = "LaraTik", email = "platform@example.invalid" }
+]
+description = "LaraTik operational cash custody for ERPNext v16"
+requires-python = ">=3.14"
+dynamic = ["version"]
+dependencies = [
+    # "frappe~=16.0.0" # Installed and managed by bench.
+]
+
+# ─── WHY THIS FILE IS AT THE APP ROOT ─────────────────────────────────────────
+#
+# bench reads this file from the APP ROOT — the directory it calls
+# `apps/<app>/` — and that is exactly where this one is:
+#
+#     laratik_cashbox/            <- the APP ROOT. This file is here.
+#     ├── pyproject.toml          <- ...
+#     └── laratik_cashbox/        <- the app PACKAGE.
+#         ├── __init__.py         <- flit reads __version__ from here.
+#         ├── hooks.py
+#         ├── modules.txt
+#         └── laratik_cashbox/    <- the Frappe module.
+#             └── doctype/
+#
+# `laratik_cashbox/laratik_cashbox/erpnext_version.py` used to say that a
+# `pyproject.toml` could not go here, because "the app ROOT is a different
+# directory from the app PACKAGE this repository holds". That was true of
+# the PACKAGE, and irrelevant: this file is at the ROOT, which is where
+# bench reads it. What was actually missing was the file itself — the
+# bench layout was not settled when that note was written.
+#
+# `src/lib/conformance/bench-packaging-conformance.test.ts` now asserts that
+# the constraint declared HERE and the one enforced in code are the SAME
+# string, so the two cannot drift apart silently.
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+# ─── THE DECLARATIVE VERSION CONSTRAINT ───────────────────────────────────────
+#
+# bench enforces this at install time (`bench validate-dependencies`), and
+# Frappe Cloud REQUIRES it: its custom-app guide asks for "a valid
+# `pyproject.toml` file along with a key advertising the frappe version".
+# Without this file the app cannot be added to a Frappe Cloud bench at all.
+#
+# The constraint is the SAME STRING the code enforces
+# (`SUPPORTED_ERPNEXT_RANGE` in `laratik_cashbox/erpnext_version.py`), and
+# the conformance suite asserts they are identical. One constraint, two
+# places that must agree — not two constraints.
+#
+# The two do different jobs. The declarative one gives the friendly error,
+# before anything is installed. The code check (`before_install` →
+# `assert_supported_erpnext`) is the BACKSTOP: it refuses the install on the
+# wrong ERPNext even if the declarative file is not read — which is what
+# happens when the app is installed by hand rather than by bench.
+[tool.bench.frappe-dependencies]
+frappe = ">=16.0.0,<17.0.0"
+erpnext = ">=16.0.0,<17.0.0"
+
+[tool.ruff]
+line-length = 110
+target-version = "py314"

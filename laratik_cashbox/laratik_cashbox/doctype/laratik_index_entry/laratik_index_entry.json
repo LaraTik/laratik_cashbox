@@ -1,0 +1,104 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "allow_copy": 0,
+ "creation": "2026-10-21 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "artifact",
+  "company",
+  "scope_owner",
+  "sequence",
+  "content",
+  "keywords",
+  "embedding",
+  "retrieval_mode"
+ ],
+ "fields": [
+  {
+   "fieldname": "artifact",
+   "fieldtype": "Link",
+   "label": "Artifact",
+   "options": "LaraTik Artifact",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Data",
+   "label": "Company",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "scope_owner",
+   "fieldtype": "Data",
+   "label": "Scope Owner",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "label": "Sequence",
+   "reqd": 1
+  },
+  {
+   "fieldname": "content",
+   "fieldtype": "Long Text",
+   "label": "Content",
+   "reqd": 1
+  },
+  {
+   "fieldname": "keywords",
+   "fieldtype": "Long Text",
+   "label": "Keywords"
+  },
+  {
+   "fieldname": "embedding",
+   "fieldtype": "Long Text",
+   "label": "Embedding"
+  },
+  {
+   "fieldname": "retrieval_mode",
+   "fieldtype": "Select",
+   "label": "Retrieval Mode",
+   "options": "keyword\nsemantic\nhybrid",
+   "reqd": 1,
+   "default": "keyword",
+   "in_list_view": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LaraTik Cashbox",
+ "name": "LaraTik Index Entry",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "System Manager",
+   "share": 0,
+   "write": 1,
+   "amend": 0,
+   "bulk_delete": 0,
+   "cancel": 0,
+   "submit": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "hash"
+}

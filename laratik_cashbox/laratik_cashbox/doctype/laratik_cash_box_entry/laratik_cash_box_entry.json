@@ -1,0 +1,200 @@
+{
+ "actions": [],
+ "allow_copy": 0,
+ "allow_rename": 1,
+ "creation": "2026-10-22 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "entry_date",
+  "direction",
+  "amount",
+  "currency",
+  "category",
+  "money_flow",
+  "status",
+  "counterparty",
+  "funding_source",
+  "other_box",
+  "other_box_custodian",
+  "variance_amount",
+  "variance_type",
+  "purpose",
+  "notes",
+  "reference_doctype",
+  "reference_name",
+  "approver",
+  "approval_status",
+  "approval_date",
+  "approval_note",
+  "idempotency_key",
+  "reversal_of"
+ ],
+ "fields": [
+  {
+   "fieldname": "entry_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Entry Date",
+   "reqd": 1
+  },
+  {
+   "description": "Which way the money moved for THIS box. `In` raises the box's cash; `Out` lowers it. A transfer is an entry with `other_box` set, and it takes this box's direction.",
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Direction",
+   "options": "In\nOut",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1,
+   "description": "The currency this entry is in. It is REQUIRED, because a row that names no currency is silent rather than wrong - and a silent row is how a EUR entry lands in a USD balance with nothing to notice it (ADR-170). A row in a DIFFERENT currency is refused by the rollup, not converted."
+  },
+  {
+   "description": "What KIND of fact this entry records. `Invoice Issued` is an obligation the company has created but not yet settled; the other values are movements. A new kind of business fact is a new option here \u2014 it does not need a code change.",
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Category",
+   "options": "Service Payment\nInvoice Issued\nVendor Payment\nSalary\nReimbursement\nLoan\nCash\nOther",
+   "reqd": 1
+  },
+  {
+   "description": "BETWEEN whom the money moved. This is the axis that says who is on the other end, and it is deliberately separate from the category: a service payment and a vendor payment are different categories that can share a money flow.",
+   "fieldname": "money_flow",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Money Flow",
+   "options": "From Client to Us\nFrom Us to Client\nFrom Vendor to Us\nFrom Us to Vendor\nFrom Us to Employee\nFrom Employee to Us\nInternal Transfer\nLoan/Advance\nOther"
+  },
+  {
+   "default": "Completed",
+   "description": "`Cancelled` means the entry did not happen at all, and it is counted as nothing. `Pending` means the money has NOT moved yet \u2014 the entry is an obligation, and it is counted as owed rather than as received or distributed. `Completed` and `Settled` mean the money moved. `Reversed` means the money moved AND was undone by a compensating leg: the row still counts, and the leg is what takes the count back out. A row whose money moved may not be cancelled \u2014 it may be reversed (ADR-177).",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nCompleted\nSettled\nCancelled\nReversed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "counterparty",
+   "fieldtype": "Data",
+   "label": "Counterparty"
+  },
+  {
+   "default": "Company Cash",
+   "fieldname": "funding_source",
+   "fieldtype": "Select",
+   "label": "Funding Source",
+   "options": "Company Cash\nPersonal Cash\nLoan\nOther"
+  },
+  {
+   "description": "Set only on a TRANSFER: the other box the custody moved to or from. A transfer is an entry with a counterparty that is a box.",
+   "fieldname": "other_box",
+   "fieldtype": "Link",
+   "label": "Other Box",
+   "options": "LaraTik Cash Box"
+  },
+  {
+   "fieldname": "other_box_custodian",
+   "fieldtype": "Data",
+   "label": "Other Box Custodian"
+  },
+  {
+   "fieldname": "variance_amount",
+   "fieldtype": "Currency",
+   "label": "Variance Amount"
+  },
+  {
+   "default": "None",
+   "fieldname": "variance_type",
+   "fieldtype": "Select",
+   "label": "Variance Type",
+   "options": "None\nMatch\nOverpayment\nUnderpayment"
+  },
+  {
+   "fieldname": "purpose",
+   "fieldtype": "Text",
+   "label": "Purpose"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference DocType",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Name",
+   "options": "reference_doctype"
+  },
+  {
+   "fieldname": "approver",
+   "fieldtype": "Data",
+   "label": "Approver"
+  },
+  {
+   "default": "Not Required",
+   "fieldname": "approval_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Approval Status",
+   "options": "Not Required\nPending\nApproved\nRejected"
+  },
+  {
+   "fieldname": "approval_date",
+   "fieldtype": "Datetime",
+   "label": "Approval Date"
+  },
+  {
+   "fieldname": "approval_note",
+   "fieldtype": "Text",
+   "label": "Approval Note"
+  },
+  {
+   "fieldname": "idempotency_key",
+   "fieldtype": "Data",
+   "label": "Idempotency Key",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "description": "Set only on a REVERSAL: the name of the entry this row undoes. A reversal is a compensating leg \u2014 the same amount, the opposite direction \u2014 and this field is what makes the pair traceable: it says which movement the leg belongs to. It is written by the reversal path, together with that path's leg, and it is never set by hand (ADR-177).",
+   "fieldname": "reversal_of",
+   "fieldtype": "Data",
+   "label": "Reversal Of"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LaraTik Cashbox",
+ "name": "LaraTik Cash Box Entry",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
