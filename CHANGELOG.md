@@ -20,6 +20,27 @@ only re-verify their schema.
 
 ---
 
+## 0.1.2 — 2026-10-25
+
+The third release, and the first one whose image can say what it is.
+
+### Changed
+
+- **The image reports its commit.** The readiness probe answered
+  `build.commit: null` on a self-hosted image, because it read Vercel's
+  variable name for the fact. `BUILD_COMMIT` is now set by the Docker build
+  and read first, with Vercel's name kept as the fallback — so the running
+  container can say which commit it is, and a deployment can be traced to the
+  tree it came from.
+- The version is `0.1.2` in both halves, for the same reason it always is:
+  the corpus is generated from this app's tree.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.1 — 2026-10-25
 
 The second release, and the first one cut through the release machinery
