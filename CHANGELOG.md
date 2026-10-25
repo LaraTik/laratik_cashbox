@@ -20,6 +20,30 @@ only re-verify their schema.
 
 ---
 
+## 0.1.4 — 2026-10-25
+
+The fifth release. The Frappe app changes nothing; the WEB app's setup wizard
+does, and the two ship together because they are one version.
+
+### Changed
+
+- **The web app's "Chart of Accounts" picker is fed when the country is
+  chosen.** The picker was filled from a list read ONCE with the page, using
+  the country in the SAVED draft — so on a first visit, with no saved draft,
+  it was an empty, disabled select, and choosing a country in the form did
+  not change it. The list is now read when the country changes, and a failed
+  read shows no charts rather than another country's.
+- **The web app asks ERPNext for the same chart fallback ERPNext's own setup
+  wizard asks for** (`with_standard`), so a country with exactly one regional
+  chart no longer offers that chart alone.
+- The version is `0.1.4` in both halves.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.3 — 2026-10-25
 
 The fourth release, and the one where the image actually says what it is.
