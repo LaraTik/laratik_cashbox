@@ -20,6 +20,23 @@ only re-verify their schema.
 
 ---
 
+## 0.1.6 — 2026-10-26
+
+The seventh release. This release carries the company-wide physical-cash
+view and keeps the browser directory free of server-only dependencies.
+
+### Changed
+
+- The pure physical-cash classification used by employee surfaces is now
+  shared from a client-safe financial module.
+- The version is `0.1.6` in both halves.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.5 — 2026-10-26
 
 The sixth release. The Frappe schema is unchanged; the web app now reports
