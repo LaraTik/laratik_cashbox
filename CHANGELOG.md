@@ -20,6 +20,46 @@ only re-verify their schema.
 
 ---
 
+## 0.1.8 — 2026-10-26
+
+The application shell now displays the actual release version instead of a
+stale hard-coded label. The Frappe schema is unchanged.
+
+### Changed
+
+- Desktop and mobile navigation now read the displayed version from the
+  release package metadata.
+- The version is `0.1.8` in both halves.
+
+### Patches
+
+None. No schema changed.
+
+---
+
+## 0.1.7 — 2026-10-26
+
+The eighth release. The Frappe schema is unchanged; the web app now exposes
+current salary setup and keeps paid-to-date figures truthful when historical
+payout evidence has not been imported.
+
+### Changed
+
+- Employee payroll views show the current submitted salary assignment, its
+  assigned base, effective date, and source without presenting the base as
+  gross or net pay.
+- Payroll salary payments shows current assigned bases for active employees.
+- Paid-to-date is shown only from verified payroll settlement evidence; missing
+  history is labelled as not imported rather than shown as zero.
+- English and Arabic payroll copy remain in dictionary parity.
+- The version is `0.1.7` in both halves.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.6 — 2026-10-26
 
 The seventh release. This release carries the company-wide physical-cash
