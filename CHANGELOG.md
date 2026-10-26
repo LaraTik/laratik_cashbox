@@ -20,6 +20,36 @@ only re-verify their schema.
 
 ---
 
+## 0.1.9 — 2026-10-26
+
+The Payroll Center now presents complete available payroll history with
+calendar-month navigation and a separate view of verified payroll settlements
+by ledger posting date. Settlement amounts use the payroll payable account's
+currency; salary cost remains grouped by the work month on each salary slip.
+The Frappe schema is unchanged.
+
+### Changed
+
+- Payroll history can be filtered by month while preserving the selected month
+  in the URL; the default view shows all available history.
+- Gross and net salary trends follow salary-slip work months, while verified
+  payroll settlements follow their actual ledger posting months.
+- Employee totals show verified salary settlements to date, and payments without an
+  employee attribution remain separate.
+- Payroll history visuals have an exact-value desktop table and labeled phone
+  and tablet cards; English and Arabic copy are kept in parity. The responsive
+  header stays within the screen while keeping company selection and account
+  access visible.
+- Truncated or unreadable sources withhold affected totals and trends rather
+  than presenting partial amounts as complete.
+- The version is `0.1.9` in both halves.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.8 — 2026-10-26
 
 The application shell now displays the actual release version instead of a
