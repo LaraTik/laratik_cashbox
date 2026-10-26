@@ -20,6 +20,25 @@ only re-verify their schema.
 
 ---
 
+## 0.1.5 — 2026-10-26
+
+The sixth release. The Frappe schema is unchanged; the web app now reports
+company-wide physical cash across the Main and custody boxes.
+
+### Changed
+
+- Physical-cash totals include cash-rule custody boxes, keep currencies
+  separate, and exclude Outstanding claim/loan boxes.
+- Employee net-position totals exclude Outstanding claim/loan boxes.
+- Unreadable or incomplete box reads withhold the affected figures.
+- The version is `0.1.5` in both halves.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.4 — 2026-10-25
 
 The fifth release. The Frappe app changes nothing; the WEB app's setup wizard
