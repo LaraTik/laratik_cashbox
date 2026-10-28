@@ -20,6 +20,24 @@ only re-verify their schema.
 
 ---
 
+## 0.1.10 — 2026-10-28
+
+The amount formatter now safely handles harmless binary floating-point residue
+from ERPNext currency conversions. The Frappe schema is unchanged.
+
+### Changed
+
+- Company-currency amounts are normalized through the shared exact-money
+  adapter before formatting, preventing valid FX results from crashing a
+  Server Component render.
+- The version is `0.1.10` in both halves.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.9 — 2026-10-26
 
 The Payroll Center now presents complete available payroll history with
