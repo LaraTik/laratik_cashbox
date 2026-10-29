@@ -17,4 +17,4 @@ is generated from this tree. A release that bumped one and not the other
 would ship a UI that reads a schema it was not built against.
 """
 
-__version__ = "0.1.11"
+__version__ = "0.1.12"

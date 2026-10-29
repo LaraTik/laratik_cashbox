@@ -20,6 +20,25 @@ only re-verify their schema.
 
 ---
 
+## 0.1.12 — 2026-10-29
+
+This release clarifies finance and administration screen states and improves
+phone navigation. The Frappe schema is unchanged.
+
+### Changed
+
+- Expenses and Budgets distinguish an empty chart/comparison from an empty
+  register or a missing submitted cost-centre budget.
+- Settings tabs stay on one phone-width row and remain reachable by swiping.
+- Cashbox detail status and reimbursement-age labels use the selected locale.
+- The web app and Frappe app both carry version `0.1.12`.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.11 — 2026-10-29
 
 This release expands the finance overview, reporting, and Meta Ads billing
