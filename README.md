@@ -86,7 +86,7 @@ bench --site <site> backup
 
 ## What it installs
 
-Ten DocTypes, in dependency order:
+Nineteen DocTypes, in dependency order:
 
 | DocType | What it is |
 |---|---|
@@ -100,6 +100,15 @@ Ten DocTypes, in dependency order:
 | `LaraTik Artifact` | an artefact the model produced |
 | `LaraTik Index Entry` | an index over the model's records |
 | `LaraTik Setup State` | the record that says the setup is complete |
+| `LaraTik Meta Ads Page Asset` | a Facebook Page or Instagram account attached to a billing profile |
+| `LaraTik Meta Ads Fee Rule` | a dated service-fee rate attached to a billing profile |
+| `LaraTik Meta Ads Connection` | an encrypted Meta access token and Graph API version |
+| `LaraTik Meta Ads Billing Profile` | the customer payer, base fee, invoice currency, dated fee rules, and page mappings |
+| `LaraTik Meta Ads Account` | a discovered ad account and its assigned billing profile |
+| `LaraTik Meta Ads Spend` | immutable daily account-level Insights spend snapshots |
+| `LaraTik Meta Ads Sync` | the date range and result of each account sync |
+| `LaraTik Meta Ads Payment Import` | an immutable import batch for Meta billing CSV evidence |
+| `LaraTik Meta Ads Payment` | an immutable account-level Meta payment or credit row |
 
 ---
 

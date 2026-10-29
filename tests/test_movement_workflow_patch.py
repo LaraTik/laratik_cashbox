@@ -67,8 +67,24 @@ def test_installs_workflow_with_separated_approval_and_completion(patch_module):
     assert next(row for row in workflow["states"] if row["state"] == "Submitted")["doc_status"] == "1"
 
 
-def test_fresh_install_hook_creates_the_workflow(patch_module):
+def test_fresh_install_hook_creates_the_workflow(patch_module, monkeypatch):
     module, _fake, inserted = patch_module
+
+    # This test isolates the movement workflow behavior. Fresh-install schema
+    # verification for the independently tested Meta Ads doctypes is stubbed
+    # so their presence does not mask whether the hook creates the workflow.
+    for name in (
+        "laratik_meta_ads_page_asset",
+            "laratik_meta_ads_fee_rule",
+        "laratik_meta_ads_connection",
+        "laratik_meta_ads_billing_profile",
+        "laratik_meta_ads_account",
+        "laratik_meta_ads_spend",
+        "laratik_meta_ads_sync",
+        "laratik_meta_ads_payment_import",
+        "laratik_meta_ads_payment",
+    ):
+        monkeypatch.setattr(module, name, lambda: None)
 
     module.after_install()
 

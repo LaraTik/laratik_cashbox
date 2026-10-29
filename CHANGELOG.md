@@ -20,6 +20,45 @@ only re-verify their schema.
 
 ---
 
+## 0.1.11 — 2026-10-29
+
+This release expands the finance overview, reporting, and Meta Ads billing
+workflows, with consistent navigation and responsive layouts across the
+finance and administration screens. It also introduces the Meta Ads schema
+used by those workflows.
+
+### Changed
+
+- Finance reports, projects, parties, invoices, employees, reimbursements,
+  advances, AI records, and selected administration lists provide clearer
+  scope and page navigation.
+- Meta Ads spend, payment evidence, and setup are separate URL-addressable
+  views. Incomplete or truncated payment evidence withholds totals.
+- Cashbox, transfer, employee, billing, and report screens use compact mobile
+  layouts while retaining detailed desktop tables.
+- Cash counts use the linked account currency; unverified payroll and payment
+  evidence remains distinct from posted accounting amounts.
+- Shared route typography, card surfaces, table headers, and pagination now
+  follow one dashboard hierarchy.
+- The web app and Frappe app both carry version `0.1.11`.
+
+### Patches
+
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_page_asset`
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_fee_rule`
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_connection`
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_billing_profile`
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_account`
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_spend`
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_sync`
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_payment_import`
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_payment`
+
+These patches verify the DocTypes after model sync. They do not create
+accounting postings or alter existing posted vouchers.
+
+---
+
 ## 0.1.10 — 2026-10-28
 
 The amount formatter now safely handles harmless binary floating-point residue

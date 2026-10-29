@@ -1,0 +1,104 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-10-27 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "customer",
+  "relationship_kind",
+  "fee_percent",
+  "fee_rules",
+  "invoice_currency",
+  "page_assets",
+  "disabled"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Billing Customer",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "default": "Customer",
+   "fieldname": "relationship_kind",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Relationship",
+   "options": "Customer\nThird Party",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "fee_percent",
+   "fieldtype": "Percent",
+   "label": "Service Fee Percent",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fee_rules",
+   "fieldtype": "Table",
+   "label": "Dated Service Fee Rules",
+   "options": "LaraTik Meta Ads Fee Rule"
+  },
+  {
+   "fieldname": "invoice_currency",
+   "fieldtype": "Link",
+   "label": "Invoice Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "page_assets",
+   "fieldtype": "Table",
+   "label": "Facebook and Instagram Pages",
+   "options": "LaraTik Meta Ads Page Asset"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LaraTik Cashbox",
+ "name": "LaraTik Meta Ads Billing Profile",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "System Manager",
+   "share": 0,
+   "write": 1,
+   "amend": 0,
+   "cancel": 0,
+   "submit": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "autoname": "hash"
+}

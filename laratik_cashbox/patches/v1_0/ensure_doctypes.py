@@ -53,6 +53,15 @@ DOCTYPES = [
 	("LaraTik Cash Box Entry", "laratik_cash_box_entry"),
 	("LaraTik Cash Box Pending", "laratik_cash_box_pending"),
 	("LaraTik Cash Box", "laratik_cash_box"),
+	("LaraTik Meta Ads Page Asset", "laratik_meta_ads_page_asset"),
+	("LaraTik Meta Ads Fee Rule", "laratik_meta_ads_fee_rule"),
+	("LaraTik Meta Ads Connection", "laratik_meta_ads_connection"),
+	("LaraTik Meta Ads Billing Profile", "laratik_meta_ads_billing_profile"),
+	("LaraTik Meta Ads Account", "laratik_meta_ads_account"),
+	("LaraTik Meta Ads Spend", "laratik_meta_ads_spend"),
+	("LaraTik Meta Ads Sync", "laratik_meta_ads_sync"),
+	("LaraTik Meta Ads Payment Import", "laratik_meta_ads_payment_import"),
+	("LaraTik Meta Ads Payment", "laratik_meta_ads_payment"),
 	("LaraTik Collection", "laratik_collection"),
 	("LaraTik Item", "laratik_item"),
 	("LaraTik Metric", "laratik_metric"),
@@ -178,6 +187,15 @@ def cash_movement_workflow() -> None:
 def after_install() -> None:
 	"""Create install-time setup skipped when Frappe marks patches complete."""
 	cash_movement_workflow()
+	laratik_meta_ads_page_asset()
+	laratik_meta_ads_fee_rule()
+	laratik_meta_ads_connection()
+	laratik_meta_ads_billing_profile()
+	laratik_meta_ads_account()
+	laratik_meta_ads_spend()
+	laratik_meta_ads_sync()
+	laratik_meta_ads_payment_import()
+	laratik_meta_ads_payment()
 
 
 def laratik_cash_box_pending() -> None:
@@ -218,3 +236,48 @@ def laratik_index_entry() -> None:
 def laratik_setup_state() -> None:
 	"""Verify the resumable setup state singleton synced."""
 	verify_doctype("LaraTik Setup State", "laratik_setup_state")
+
+
+def laratik_meta_ads_page_asset() -> None:
+	"""Verify the Meta Page/Instagram asset child schema synced."""
+	verify_doctype("LaraTik Meta Ads Page Asset", "laratik_meta_ads_page_asset")
+
+
+def laratik_meta_ads_fee_rule() -> None:
+	"""Verify the dated Meta billing-profile fee rule schema synced."""
+	verify_doctype("LaraTik Meta Ads Fee Rule", "laratik_meta_ads_fee_rule")
+
+
+def laratik_meta_ads_connection() -> None:
+	"""Verify the encrypted Meta connection schema synced."""
+	verify_doctype("LaraTik Meta Ads Connection", "laratik_meta_ads_connection")
+
+
+def laratik_meta_ads_billing_profile() -> None:
+	"""Verify the customer/third-party billing profile schema synced."""
+	verify_doctype("LaraTik Meta Ads Billing Profile", "laratik_meta_ads_billing_profile")
+
+
+def laratik_meta_ads_account() -> None:
+	"""Verify the Meta ad-account schema synced."""
+	verify_doctype("LaraTik Meta Ads Account", "laratik_meta_ads_account")
+
+
+def laratik_meta_ads_spend() -> None:
+	"""Verify daily Meta Insights spend snapshots synced."""
+	verify_doctype("LaraTik Meta Ads Spend", "laratik_meta_ads_spend")
+
+
+def laratik_meta_ads_sync() -> None:
+	"""Verify Meta spend sync audit records synced."""
+	verify_doctype("LaraTik Meta Ads Sync", "laratik_meta_ads_sync")
+
+
+def laratik_meta_ads_payment_import() -> None:
+	"""Verify the Meta billing-report import batch schema synced."""
+	verify_doctype("LaraTik Meta Ads Payment Import", "laratik_meta_ads_payment_import")
+
+
+def laratik_meta_ads_payment() -> None:
+	"""Verify immutable Meta payment records synced."""
+	verify_doctype("LaraTik Meta Ads Payment", "laratik_meta_ads_payment")

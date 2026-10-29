@@ -9,7 +9,7 @@ def test_every_app_doctype_manifest_is_a_doctype_record_in_its_module():
     doctype_root = Path(__file__).parents[1] / "laratik_cashbox" / "laratik_cashbox" / "doctype"
     manifests = sorted(doctype_root.glob("*/**/*.json"))
 
-    assert len(manifests) == 10
+    assert len(manifests) == 19
     for path in manifests:
         manifest = json.loads(path.read_text(encoding="utf-8"))
         assert manifest["doctype"] == "DocType", path
