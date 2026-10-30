@@ -54,3 +54,9 @@ before_install = (
 # such as the standalone movement Workflow must be created here as well as by
 # the post-model-sync patch used during later upgrades.
 after_install = "laratik_cashbox.patches.v1_0.ensure_doctypes.after_install"
+
+# Keep active Meta Ads accounts current without tying up the scheduler worker
+# while Meta paginates Insights. The coordinator queues one long job per account.
+scheduler_events = {
+    "daily_long": ["laratik_cashbox.meta_ads_scheduler.schedule_daily_meta_ads_sync"]
+}

@@ -20,6 +20,22 @@ only re-verify their schema.
 
 ---
 
+## 0.1.13 — 2026-10-29
+
+Active Meta ad accounts now receive a daily background refresh of the previous
+four complete days in the account's own time zone. Starting on the fourth
+local day of each month, the scheduler also retries a full previous-month sync
+until a complete account and ad Insights run covers that period. Each account
+is queued as a separate long job, and Paused accounts are skipped. The refresh
+stores updated Insights snapshots only; payment evidence remains a separate
+CSV import.
+
+### Patches
+
+None. No schema changed.
+
+---
+
 ## 0.1.12 — 2026-10-29
 
 This release clarifies finance and administration screen states and improves
