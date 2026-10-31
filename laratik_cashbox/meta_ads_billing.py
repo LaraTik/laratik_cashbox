@@ -72,7 +72,7 @@ def import_billing_report(company, account_name, file_name, csv_base64):
 	profile = prepared["profile"]
 	parsed = prepared["parsed"]
 	new_rows = prepared["new_rows"]
-	rows = parsed["rows"]
+	batch_snapshot = _profile_snapshot(profile, parsed["end_date"])
 
 	imported_at = now_datetime()
 	batch = frappe.get_doc({
@@ -80,12 +80,12 @@ def import_billing_report(company, account_name, file_name, csv_base64):
 		"company": company_name,
 		"ad_account": account.name,
 		"external_account_id": account.external_account_id,
-		"billing_profile_snapshot": profile.name,
-		"billing_customer_snapshot": profile.customer,
-		"relationship_kind_snapshot": profile.relationship_kind or "Customer",
-		"fee_percent_snapshot": _fee_percent_for_date(profile.as_dict(), parsed["end_date"]),
-		"invoice_currency_snapshot": profile.invoice_currency,
-		"page_assets_snapshot": _page_assets_snapshot(profile),
+		"billing_profile_snapshot": batch_snapshot["profile"],
+		"billing_customer_snapshot": batch_snapshot["customer"],
+		"relationship_kind_snapshot": batch_snapshot["relationship_kind"],
+		"fee_percent_snapshot": batch_snapshot["fee_percent"],
+		"invoice_currency_snapshot": batch_snapshot["invoice_currency"],
+		"page_assets_snapshot": batch_snapshot["page_assets"],
 		"report_start_date": parsed["start_date"],
 		"report_end_date": parsed["end_date"],
 		"currency": parsed["currency"],
@@ -118,6 +118,7 @@ def import_billing_report(company, account_name, file_name, csv_base64):
 	batch.db_set("source_file", file_doc.name, update_modified=False)
 
 	for row in new_rows:
+		row_snapshot = _profile_snapshot(profile, row["transaction_date"])
 		payment = frappe.get_doc({
 			"doctype": "LaraTik Meta Ads Payment",
 			"transaction_key": row["transaction_key"],
@@ -125,12 +126,12 @@ def import_billing_report(company, account_name, file_name, csv_base64):
 			"company": company_name,
 			"ad_account": account.name,
 			"external_account_id": account.external_account_id,
-			"billing_profile_snapshot": profile.name,
-			"billing_customer_snapshot": profile.customer,
-			"relationship_kind_snapshot": profile.relationship_kind or "Customer",
-			"fee_percent_snapshot": _fee_percent_for_date(profile.as_dict(), row["transaction_date"]),
-			"invoice_currency_snapshot": profile.invoice_currency,
-			"page_assets_snapshot": _page_assets_snapshot(profile),
+			"billing_profile_snapshot": row_snapshot["profile"],
+			"billing_customer_snapshot": row_snapshot["customer"],
+			"relationship_kind_snapshot": row_snapshot["relationship_kind"],
+			"fee_percent_snapshot": row_snapshot["fee_percent"],
+			"invoice_currency_snapshot": row_snapshot["invoice_currency"],
+			"page_assets_snapshot": row_snapshot["page_assets"],
 			"transaction_date": row["transaction_date"],
 			"transaction_id": row["transaction_id"],
 			"amount": row["amount"],
@@ -151,6 +152,7 @@ def import_billing_report(company, account_name, file_name, csv_base64):
 		"start_date": parsed["start_date"],
 		"end_date": parsed["end_date"],
 		"currency": parsed["currency"],
+		"assignment_status": "Mapped" if profile else "Unassigned",
 		"payment_total": parsed["totals"]["Payment"],
 		"refund_total": parsed["totals"]["Refund"],
 		"credit_total": parsed["totals"]["Credit"],
@@ -232,20 +234,23 @@ def get_billing_report(company, since, until, account_name=None, page=0):
 		if profile_name not in profile_cache:
 			profile_cache[profile_name] = _profile_names(raw.billing_customer_snapshot)
 		profile = profile_cache[profile_name]
+		assignment_status = "Mapped" if profile_name else "Unassigned"
+		customer_name = profile["customer_name"] if profile_name else _unassigned_account_label(account)
 		group_key = "|".join((
-			profile_name or f"unmapped:{account.name}",
-			_decimal_text(fee_percent),
+			profile_name or f"unassigned:{account.name}",
+			_decimal_text(fee_percent) if profile_name else "unassigned",
 			raw.invoice_currency_snapshot or "",
-			raw.relationship_kind_snapshot or "Customer",
+			(raw.relationship_kind_snapshot or "Customer") if profile_name else "",
 		))
 		if group_key not in group_map:
 			group_map[group_key] = {
 				"key": group_key,
+				"assignment_status": assignment_status,
 				"profile": profile_name,
 				"customer": raw.billing_customer_snapshot or "",
-				"customer_name": profile["customer_name"],
-				"relationship_kind": raw.relationship_kind_snapshot or "Customer",
-				"fee_percent": _decimal_text(fee_percent),
+				"customer_name": customer_name,
+				"relationship_kind": (raw.relationship_kind_snapshot or "Customer") if profile_name else "",
+				"fee_percent": _decimal_text(fee_percent) if profile_name else "",
 				"invoice_currency": raw.invoice_currency_snapshot or "",
 				"page_assets": [],
 				"accounts": {},
@@ -279,8 +284,9 @@ def get_billing_report(company, since, until, account_name=None, page=0):
 			"account_name": account.account_name,
 			"external_account_id": raw.external_account_id,
 			"profile": profile_name,
+			"assignment_status": assignment_status,
 			"customer": raw.billing_customer_snapshot or "",
-			"customer_name": profile["customer_name"],
+			"customer_name": customer_name,
 			"transaction_date": str(raw.transaction_date),
 			"transaction_id": raw.transaction_id,
 			"amount": format(amount, "f"),
@@ -300,6 +306,7 @@ def get_billing_report(company, since, until, account_name=None, page=0):
 		unclassified_amounts = group["unclassified"]
 		billing_groups.append({
 			"key": group["key"],
+			"assignment_status": group["assignment_status"],
 			"profile": group["profile"],
 			"customer": group["customer"],
 			"customer_name": group["customer_name"],
@@ -326,7 +333,7 @@ def get_billing_report(company, since, until, account_name=None, page=0):
 			**({"ad_account": account_name} if account_name else {}),
 		},
 		fields=[
-			"name", "ad_account", "external_account_id", "billing_customer_snapshot", "report_start_date",
+			"name", "ad_account", "external_account_id", "billing_profile_snapshot", "billing_customer_snapshot", "report_start_date",
 			"report_end_date", "currency", "report_row_count", "inserted_row_count", "duplicate_row_count",
 			"source", "source_file", "imported_at",
 		],
@@ -366,7 +373,8 @@ def get_billing_report(company, since, until, account_name=None, page=0):
 			"account_name": account_by_name.get(row.ad_account).account_name if account_by_name.get(row.ad_account) else row.external_account_id,
 			"external_account_id": row.external_account_id,
 			"customer": row.billing_customer_snapshot or "",
-			"customer_name": customer_names.get(row.billing_customer_snapshot, ""),
+			"customer_name": _import_customer_name(row, customer_names, account_by_name),
+			"assignment_status": "Mapped" if row.billing_profile_snapshot else "Unassigned",
 			"start_date": str(row.report_start_date),
 			"end_date": str(row.report_end_date),
 			"currency": row.currency,
@@ -387,18 +395,18 @@ def _prepare_import(company_name, account_name, file_name, csv_base64):
 	account.check_permission("read")
 	if account.company != company_name:
 		frappe.throw("The Meta ad account belongs to another Company.")
-	if not account.billing_profile:
-		frappe.throw("Map this ad account to a billing profile before importing payments.")
-	profile = frappe.get_doc("LaraTik Meta Ads Billing Profile", account.billing_profile)
-	profile.check_permission("read")
-	if profile.company != company_name or profile.disabled:
-		frappe.throw("Choose an enabled billing profile for this Company before importing payments.")
-	if not profile.customer or not frappe.db.exists("Customer", profile.customer):
-		frappe.throw("The account's billing profile must name an existing Customer.")
-	if not profile.invoice_currency or not frappe.db.exists("Currency", profile.invoice_currency):
-		frappe.throw("The account's billing profile must name an enabled invoice currency.")
-	if not frappe.db.get_value("Currency", profile.invoice_currency, "enabled"):
-		frappe.throw("The account's billing profile must name an enabled invoice currency.")
+	profile = None
+	if account.billing_profile:
+		profile = frappe.get_doc("LaraTik Meta Ads Billing Profile", account.billing_profile)
+		profile.check_permission("read")
+		if profile.company != company_name or profile.disabled:
+			frappe.throw("Choose an enabled billing profile for this Company before importing payments.")
+		if not profile.customer or not frappe.db.exists("Customer", profile.customer):
+			frappe.throw("The account's billing profile must name an existing Customer.")
+		if not profile.invoice_currency or not frappe.db.exists("Currency", profile.invoice_currency):
+			frappe.throw("The account's billing profile must name an enabled invoice currency.")
+		if not frappe.db.get_value("Currency", profile.invoice_currency, "enabled"):
+			frappe.throw("The account's billing profile must name an enabled invoice currency.")
 
 	file_bytes, safe_name = _decode_upload(file_name, csv_base64)
 	parsed = _parse_report(file_bytes, account)
@@ -431,12 +439,13 @@ def _prepare_import(company_name, account_name, file_name, csv_base64):
 			"account": account.name,
 			"account_name": account.account_name,
 			"external_account_id": account.external_account_id,
-			"customer": profile.customer,
-			"customer_name": frappe.db.get_value("Customer", profile.customer, "customer_name") or profile.customer,
-			"billing_profile": profile.name,
-			"relationship_kind": profile.relationship_kind or "Customer",
-			"fee_percent": _fee_percent_for_date(profile.as_dict(), parsed["end_date"]),
-			"invoice_currency": profile.invoice_currency,
+			"customer": profile.customer if profile else "",
+			"customer_name": (frappe.db.get_value("Customer", profile.customer, "customer_name") or profile.customer) if profile else _unassigned_account_label(account),
+			"billing_profile": profile.name if profile else "",
+			"assignment_status": "Mapped" if profile else "Unassigned",
+			"relationship_kind": (profile.relationship_kind or "Customer") if profile else "",
+			"fee_percent": _fee_percent_for_date(profile.as_dict(), parsed["end_date"]) if profile else "",
+			"invoice_currency": profile.invoice_currency if profile else "",
 			"start_date": parsed["start_date"],
 			"end_date": parsed["end_date"],
 			"currency": parsed["currency"],
@@ -486,6 +495,17 @@ def _parse_report(content, account):
 		frappe.throw("The Meta billing CSV could not be read.")
 	if len(csv_rows) > MAX_IMPORT_ROWS + 1000:
 		frappe.throw("This billing report has too many lines to import in one batch.")
+	current_export_headers = [
+		row for row in csv_rows
+		if [cell.strip().casefold() for cell in row[:5]] == [
+			"date", "transaction id", "payment method", "amount", "currency",
+		]
+	]
+	if current_export_headers:
+		normalized = _normalize_meta_invoice_summary(csv_rows, account)
+		parsed = _parse_report(normalized, account)
+		parsed["sha256"] = hashlib.sha256(content).hexdigest()
+		return parsed
 	report_period_values = []
 	transaction_date_values = []
 	for raw_row in csv_rows:
@@ -629,6 +649,165 @@ def _parse_report(content, account):
 	}
 
 
+def _normalize_meta_invoice_summary(csv_rows, account):
+	"""Normalize Meta's current invoice-summary layout to the checked section format."""
+	main_header = ["date", "transaction id", "payment method", "amount", "currency"]
+	header_indexes = [
+		index for index, row in enumerate(csv_rows)
+		if [cell.strip().casefold() for cell in row[:5]] == main_header
+	]
+	if len(header_indexes) != 1:
+		frappe.throw("The Meta invoice-summary CSV must contain exactly one payment table.")
+	header_index = header_indexes[0]
+
+	file_accounts = []
+	for row in csv_rows[:header_index]:
+		for cell in row:
+			match = re.fullmatch(r"\s*account:\s*(.*?)\s*", cell, re.IGNORECASE)
+			if match:
+				account_match = META_ACCOUNT_PATTERN.fullmatch(match.group(1))
+				if not account_match:
+					frappe.throw("The Meta invoice-summary CSV has an invalid ad account ID.")
+				file_accounts.append(account_match.group(1))
+	if len(file_accounts) != 1 or file_accounts[0] != _account_digits(account.external_account_id):
+		frappe.throw("The CSV account ID does not match the selected Meta ad account.")
+
+	transaction_date_values = [
+		row[0].strip() for row in csv_rows[header_index + 1:]
+		if row and _looks_like_date(row[0])
+	]
+	date_order = _infer_day_first(transaction_date_values)
+	# The only row-method table is also the header used to detect this export
+	# format, so seed its section before walking the rows that follow it.
+	current_section = {"mode": "row_method", "method": "", "rows": [], "total": None}
+	sections = [current_section]
+	pending_method = ""
+
+	for row_number, raw_row in enumerate(csv_rows[header_index + 1:], start=header_index + 2):
+		cells = [cell.strip() for cell in raw_row]
+		if not any(cells):
+			continue
+
+		if len(cells) == 1:
+			label = cells[0].casefold()
+			if label == "meta ads payment":
+				if current_section and current_section["total"] is None:
+					frappe.throw("The Meta invoice-summary CSV is missing a section total.")
+				current_section = None
+				pending_method = ""
+				continue
+			if label.startswith("payment method:"):
+				if current_section and current_section["total"] is None:
+					frappe.throw("The Meta invoice-summary CSV is missing a section total.")
+				pending_method = cells[0].split(":", 1)[1].strip()
+				if not pending_method:
+					frappe.throw("The Meta invoice-summary CSV has an empty payment method.")
+				current_section = None
+				continue
+			if label.startswith(("vat rate:", "vat amount:")):
+				continue
+
+		row_header = [cell.casefold() for cell in cells]
+		if row_header[:5] == main_header:
+			if current_section and current_section["total"] is None:
+				frappe.throw("The Meta invoice-summary CSV is missing a section total.")
+			current_section = {"mode": "row_method", "method": "", "rows": [], "total": None}
+			sections.append(current_section)
+			pending_method = ""
+			continue
+		if row_header[:4] == ["date", "transaction id", "amount", "currency"]:
+			if current_section and current_section["total"] is None:
+				frappe.throw("The Meta invoice-summary CSV is missing a section total.")
+			if not pending_method:
+				frappe.throw("A Meta invoice-summary transaction table is missing its payment method.")
+			current_section = {"mode": "fixed_method", "method": pending_method, "rows": [], "total": None}
+			sections.append(current_section)
+			pending_method = ""
+			continue
+
+		total_cells = None
+		if len(cells) >= 5 and cells[2].casefold() == "total amount billed":
+			total_cells = (cells[3], cells[4])
+		elif len(cells) >= 4 and cells[1].casefold() == "total amount billed":
+			total_cells = (cells[2], cells[3])
+		if total_cells is not None:
+			if not current_section or current_section["total"] is not None:
+				frappe.throw(f"The Meta invoice-summary CSV has an unexpected total on line {row_number}.")
+			try:
+				total = _csv_amount(total_cells[0])
+				currency = _currency_code(total_cells[1])
+			except (ValueError, InvalidOperation, TypeError):
+				frappe.throw(f"The Meta invoice-summary CSV has an invalid total on line {row_number}.")
+			section_rows = current_section["rows"]
+			section_amount = sum((row["amount"] for row in section_rows), Decimal(0))
+			if currency != account.currency or total != section_amount:
+				frappe.throw("The Meta invoice-summary section total does not match its transaction rows.")
+			current_section["total"] = total
+			current_section["currency"] = currency
+			current_section = None
+			continue
+
+		if _looks_like_date(cells[0]):
+			if current_section is None:
+				frappe.throw(f"A Meta invoice-summary transaction appears outside a payment table on line {row_number}.")
+			if current_section["mode"] == "row_method":
+				if len(cells) < 5 or any(cells[5:]):
+					frappe.throw(f"The Meta invoice-summary transaction has an invalid shape on line {row_number}.")
+				method, amount_value, currency_value = cells[2], cells[3], cells[4]
+			else:
+				if len(cells) < 4 or any(cells[4:]):
+					frappe.throw(f"The Meta invoice-summary transaction has an invalid shape on line {row_number}.")
+				method, amount_value, currency_value = current_section["method"], cells[2], cells[3]
+			try:
+				transaction_date = _parse_date(cells[0], date_order)
+				transaction_id = _text(cells[1], "Transaction ID", 140)
+				amount = _csv_amount(amount_value)
+				currency = _currency_code(currency_value)
+				method = _text(method, "Payment method", 140)
+				if not transaction_id or transaction_id.casefold() == "nan":
+					raise ValueError("Transaction ID is empty.")
+				if amount == 0:
+					raise ValueError("Transaction amount is zero.")
+				if currency != account.currency or not method:
+					raise ValueError("Transaction currency or payment method is invalid.")
+			except (ValueError, InvalidOperation, TypeError):
+				frappe.throw(f"The Meta invoice-summary CSV contains an invalid transaction on line {row_number}.")
+			current_section["rows"].append({
+				"date": transaction_date.strftime("%d/%m/%Y") if date_order is True else transaction_date.isoformat(),
+				"transaction_id": transaction_id,
+				"amount": amount,
+				"currency": currency,
+				"method": method,
+			})
+			continue
+
+		frappe.throw(f"The Meta invoice-summary CSV has an unsupported row on line {row_number}.")
+
+	if current_section and current_section["total"] is None:
+		frappe.throw("The Meta invoice-summary CSV is missing a section total.")
+	if not sections or not any(section["rows"] for section in sections):
+		frappe.throw("The Meta invoice-summary CSV contains no transaction rows.")
+
+	normalized_rows = [[f"Account: {file_accounts[0]}"]]
+	for section in sections:
+		by_method = {}
+		for row in section["rows"]:
+			by_method.setdefault(row["method"], []).append(row)
+		for method, method_rows in by_method.items():
+			normalized_rows.append([f"Payment method: {method}"])
+			normalized_rows.append(["Date", "Transaction ID", "Amount", "Currency"])
+			for row in method_rows:
+				normalized_rows.append([
+					row["date"], row["transaction_id"], _canonical_amount(row["amount"]), row["currency"],
+				])
+			total = sum((row["amount"] for row in method_rows), Decimal(0))
+			normalized_rows.append(["", "Total amount billed", _canonical_amount(total), method_rows[0]["currency"]])
+
+	output = io.StringIO(newline="")
+	csv.writer(output).writerows(normalized_rows)
+	return output.getvalue().encode("utf-8")
+
+
 def _record_kind(method, amount):
 	normalized = re.sub(r"[^a-z0-9]+", " ", method.casefold()).strip()
 	if any(token in normalized for token in ("ad credit", "promotional credit", "account credit")):
@@ -749,7 +928,42 @@ def _profile_names(customer):
 	return {"customer_name": name or customer or ""}
 
 
+def _unassigned_account_label(account):
+	return f"Unassigned account-level — {account.account_name or account.external_account_id}"
+
+
+def _import_customer_name(row, customer_names, account_by_name):
+	if row.billing_customer_snapshot:
+		return customer_names.get(row.billing_customer_snapshot) or row.billing_customer_snapshot
+	account = account_by_name.get(row.ad_account)
+	if account:
+		return _unassigned_account_label(account)
+	return f"Unassigned account-level — {row.external_account_id}"
+
+
+def _profile_snapshot(profile, effective_date):
+	if not profile:
+		return {
+			"profile": "",
+			"customer": "",
+			"relationship_kind": "",
+			"fee_percent": "",
+			"invoice_currency": "",
+			"page_assets": "[]",
+		}
+	return {
+		"profile": profile.name,
+		"customer": profile.customer,
+		"relationship_kind": profile.relationship_kind or "Customer",
+		"fee_percent": _fee_percent_for_date(profile.as_dict(), effective_date),
+		"invoice_currency": profile.invoice_currency,
+		"page_assets": _page_assets_snapshot(profile),
+	}
+
+
 def _page_assets_snapshot(profile):
+	if not profile:
+		return "[]"
 	return json.dumps([{
 		"page_id": row.page_id or "",
 		"page_name": row.page_name or "",

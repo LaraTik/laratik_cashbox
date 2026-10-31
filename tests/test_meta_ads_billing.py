@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import importlib
 import sys
 import types
@@ -194,6 +195,25 @@ def csv_report(rows, total, *, account="act_123", currency="EUR"):
     return "\n".join(lines).encode("utf-8")
 
 
+def current_meta_invoice_summary(*, account="act_123", payment_total="15.00", credit_total="0.15"):
+    return (
+        f"Account: {account},,,,,\n"
+        "Advertiser Information\n"
+        "Meta ads payment\n"
+        "Date,Transaction ID,Payment method,Amount,Currency\n"
+        "31/10/2026,txn-card,Mastercard ···· 5316,10.00,EUR\n"
+        "16/01/2025,txn-paypal,PayPal,5.00,EUR\n"
+        f",,Total amount billed,{payment_total},EUR\n"
+        "Meta ads payment\n"
+        "Payment Method: Ad credit\n"
+        "Date,Transaction ID,Amount,Currency\n"
+        "28/05/2026,txn-credit,0.15,EUR\n"
+        f",Total amount billed,{credit_total},EUR\n"
+        "VAT Rate: 19%\n"
+        "VAT Amount: 2.40\n"
+    ).encode("utf-8")
+
+
 def call_preview(module, csv_bytes):
     encoded = base64.b64encode(csv_bytes).decode("ascii")
     return module.preview_billing_report("Company A", "Meta Account A", "meta.csv", encoded)
@@ -208,6 +228,55 @@ def test_csv_parser_accepts_valid_account_and_checks_section_total(billing):
     assert parsed["end_date"] == "2026-10-02"
     assert parsed["counts"]["Payment"] == 1
     assert parsed["totals"]["Payment"] == "10.25"
+
+
+def test_current_meta_invoice_summary_imports_all_payment_and_ad_credit_sections(billing):
+    module, fake = billing
+    fake.account.billing_profile = ""
+    content = current_meta_invoice_summary()
+    encoded = base64.b64encode(content).decode("ascii")
+
+    parsed = module._parse_report(content, fake.account)
+    preview = module.preview_billing_report("Company A", "Meta Account A", "invoice_summary.csv", encoded)
+    result = module.import_billing_report("Company A", "Meta Account A", "invoice_summary.csv", encoded)
+
+    assert parsed["sha256"] == hashlib.sha256(content).hexdigest()
+    assert parsed["report_row_count"] == 3
+    assert parsed["start_date"] == "2025-01-16"
+    assert parsed["end_date"] == "2026-10-31"
+    assert parsed["counts"] == {"Payment": 2, "Refund": 0, "Credit": 1, "Unclassified": 0}
+    assert parsed["totals"]["Payment"] == "15"
+    assert parsed["totals"]["Credit"] == "0.15"
+    assert preview["assignment_status"] == "Unassigned"
+    assert preview["payment_total"] == "15"
+    assert preview["credit_total"] == "0.15"
+    assert result["inserted_row_count"] == 3
+    assert [row.record_kind for row in fake.inserted if row.doctype == "LaraTik Meta Ads Payment"] == [
+        "Payment", "Payment", "Credit",
+    ]
+
+
+def test_current_meta_invoice_summary_checks_embedded_account_id(billing):
+    module, fake = billing
+    content = current_meta_invoice_summary(account="act_999")
+    encoded = base64.b64encode(content).decode("ascii")
+
+    with pytest.raises(FrappeError, match="account ID does not match"):
+        module.preview_billing_report("Company A", "Meta Account A", "invoice_summary.csv", encoded)
+
+    assert fake.inserted == []
+    assert fake.saved_files == []
+
+
+def test_current_meta_invoice_summary_rejects_a_section_total_that_does_not_reconcile(billing):
+    module, fake = billing
+    content = current_meta_invoice_summary(payment_total="15.01")
+
+    with pytest.raises(FrappeError, match="section total does not match"):
+        module._parse_report(content, fake.account)
+
+    assert fake.inserted == []
+    assert fake.saved_files == []
 
 
 def test_spend_report_lists_all_company_accounts_while_scoping_selected_report(billing, monkeypatch):
@@ -379,6 +448,108 @@ def test_payment_rows_keep_import_time_payer_fee_currency_and_page_snapshots(bil
     } == original_snapshot
 
 
+def test_payment_import_keeps_unmapped_account_transactions_without_inventing_a_payer(billing):
+    module, fake = billing
+    fake.account.billing_profile = ""
+    content = csv_report([("txn-unmapped-1", "10.00")], "10.00")
+    encoded = base64.b64encode(content).decode("ascii")
+
+    preview = module.preview_billing_report("Company A", "Meta Account A", "meta.csv", encoded)
+    result = module.import_billing_report("Company A", "Meta Account A", "meta.csv", encoded)
+
+    batch = next(row for row in fake.inserted if row.doctype == "LaraTik Meta Ads Payment Import")
+    payment = next(row for row in fake.inserted if row.doctype == "LaraTik Meta Ads Payment")
+    assert preview["assignment_status"] == "Unassigned"
+    assert preview["billing_profile"] == ""
+    assert preview["customer"] == ""
+    assert preview["can_import"] is True
+    assert result["inserted_row_count"] == 1
+    assert batch.billing_profile_snapshot == ""
+    assert batch.billing_customer_snapshot == ""
+    assert payment.billing_profile_snapshot == ""
+    assert payment.billing_customer_snapshot == ""
+    assert payment.relationship_kind_snapshot == ""
+    assert payment.fee_percent_snapshot == ""
+    assert payment.invoice_currency_snapshot == ""
+    assert payment.page_assets_snapshot == "[]"
+    assert payment.external_account_id == "act_123"
+    assert payment.amount == "10"
+
+
+def test_billing_report_labels_unassigned_payments_by_ad_account(billing):
+    module, fake = billing
+    account = SimpleNamespace(
+        name="Meta Account A",
+        external_account_id="act_123",
+        account_name="Example Ads",
+        currency="EUR",
+        billing_profile="",
+    )
+    payment = SimpleNamespace(
+        name="PAY-1",
+        import_batch="IMPORT-1",
+        ad_account=account.name,
+        external_account_id=account.external_account_id,
+        billing_profile_snapshot="",
+        billing_customer_snapshot="",
+        relationship_kind_snapshot="",
+        fee_percent_snapshot="",
+        invoice_currency_snapshot="",
+        page_assets_snapshot="[]",
+        transaction_date="2026-10-02",
+        transaction_id="txn-unmapped-1",
+        amount="10.00",
+        currency="EUR",
+        payment_method="Mastercard",
+        record_kind="Payment",
+        source="Meta invoice summary CSV",
+        imported_at="2026-10-28 12:00:00",
+    )
+    import_batch = SimpleNamespace(
+        name="IMPORT-1",
+        ad_account=account.name,
+        external_account_id=account.external_account_id,
+        billing_profile_snapshot="",
+        billing_customer_snapshot="",
+        report_start_date="2026-10-01",
+        report_end_date="2026-10-31",
+        currency="EUR",
+        report_row_count=1,
+        inserted_row_count=1,
+        duplicate_row_count=0,
+        source="Meta invoice summary CSV",
+        source_file="FILE-1",
+        imported_at="2026-10-28 12:00:00",
+    )
+
+    def get_all(doctype, **_kwargs):
+        if doctype == "LaraTik Meta Ads Account":
+            return [account]
+        if doctype == "LaraTik Meta Ads Payment":
+            return [payment]
+        if doctype == "LaraTik Meta Ads Payment Import":
+            return [import_batch]
+        raise AssertionError(f"Unexpected get_all({doctype!r})")
+
+    fake.get_all = get_all
+    report = module.get_billing_report("Company A", "2026-10-01", "2026-10-31")
+
+    assert report["complete"] is True
+    assert report["row_count"] == 1
+    assert report["rows"][0]["assignment_status"] == "Unassigned"
+    assert report["rows"][0]["customer"] == ""
+    assert report["rows"][0]["customer_name"] == "Unassigned account-level — Example Ads"
+    assert report["billing_groups"][0]["assignment_status"] == "Unassigned"
+    assert report["billing_groups"][0]["profile"] == ""
+    assert report["billing_groups"][0]["customer"] == ""
+    assert report["billing_groups"][0]["customer_name"] == "Unassigned account-level — Example Ads"
+    assert report["billing_groups"][0]["accounts"] == [{"name": "Meta Account A", "account_name": "Example Ads"}]
+    assert report["billing_groups"][0]["payments"] == {"EUR": "10.00"}
+    assert report["billing_groups"][0]["page_assets"] == []
+    assert report["imports"][0]["assignment_status"] == "Unassigned"
+    assert report["imports"][0]["customer_name"] == "Unassigned account-level — Example Ads"
+
+
 def test_preview_refuses_cross_company_account_before_saving_file_or_rows(billing):
     module, fake = billing
     fake.account.company = "Company B"
@@ -462,6 +633,7 @@ def test_billing_import_history_includes_the_saved_meta_account_id(billing):
                 name="Import-1",
                 ad_account="Meta Account A",
                 external_account_id="act_123",
+                billing_profile_snapshot="Example Profile",
                 billing_customer_snapshot="Example Customer",
                 report_start_date="2026-10-01",
                 report_end_date="2026-10-31",
@@ -502,6 +674,7 @@ def test_billing_import_history_reports_when_the_batch_limit_is_reached(billing)
                 name=f"Import-{index}",
                 ad_account="Meta Account A",
                 external_account_id="act_123",
+                billing_profile_snapshot="Example Profile",
                 billing_customer_snapshot="Example Customer",
                 report_start_date="2026-10-01",
                 report_end_date="2026-10-31",

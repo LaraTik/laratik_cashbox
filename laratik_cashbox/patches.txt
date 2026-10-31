@@ -52,3 +52,4 @@ laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_spend
 laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_sync
 laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_payment_import
 laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_payment
+laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_account_level_payments

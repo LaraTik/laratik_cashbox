@@ -20,6 +20,35 @@ only re-verify their schema.
 
 ---
 
+## 0.1.14 — 2026-10-31
+
+Meta billing-payment imports now support account-level evidence when an ad
+account has no single confirmed payer profile. The importer retains the
+original transaction rows and labels them unassigned; it does not attach an
+account's payments to a customer or allocate them across Pages. Payment
+snapshots are optional when no payer is established, while mapped imports
+continue to retain their customer, fee, invoice currency and Page snapshots.
+
+### Patches
+
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_account_level_payments`
+
+This post-model-sync patch verifies that the payer snapshot fields on the Meta
+payment and import DocTypes are optional before the new import path runs.
+
+### Changed
+
+- Admins can preview and import a connected account's invoice-summary CSV
+  without selecting a billing profile; those payments stay unassigned at the
+  account level.
+- Payment rows and import batches report whether the account-level evidence is
+  mapped or unassigned, and identify the ad account when unassigned.
+- Mapped payment rows snapshot the effective fee on each transaction date;
+  the batch also records its report-end-date profile snapshot.
+- The web app and Frappe app both carry version `0.1.14`.
+
+---
+
 ## 0.1.13 — 2026-10-29
 
 Active Meta ad accounts now receive a daily background refresh of the previous
