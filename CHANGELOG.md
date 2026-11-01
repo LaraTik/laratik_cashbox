@@ -20,6 +20,34 @@ only re-verify their schema.
 
 ---
 
+## 0.1.15 — 2026-11-01
+
+Meta Ads billing now has an auditable customer-invoice workflow. It records a
+period-pinned invoice batch and its chargeable lines before creating a draft
+ERPNext Sales Invoice; invoice submission, receipts and accounting entries
+remain in ERPNext's standard workflow. The billing policy is explicit and
+unset answers block invoice preparation. Account-level payment evidence also
+recognizes reversals without assigning payments to Pages.
+
+### Patches
+
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_import_reversal`
+- `laratik_cashbox.patches.v1_0.ensure_laratik_meta_ads_invoicing`
+
+The patches verify the reversal vocabulary and the invoicing DocTypes, fields,
+and policy vocabularies after model sync. The invoice batches and lines pin
+the period and figures used for each draft.
+
+### Changed
+
+- Billing reports distinguish delivery, Page attribution and Meta settlement.
+- Customer charges use Page-matched ad delivery costs, saved fees and dated
+  ERPNext `For Selling` rates; a missing rate withholds foreign-currency
+  amounts.
+- The web app and Frappe app both carry version `0.1.15`.
+
+---
+
 ## 0.1.14 — 2026-10-31
 
 Meta billing-payment imports now support account-level evidence when an ad

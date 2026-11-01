@@ -281,3 +281,13 @@ def laratik_meta_ads_payment_import() -> None:
 def laratik_meta_ads_payment() -> None:
 	"""Verify immutable Meta payment records synced."""
 	verify_doctype("LaraTik Meta Ads Payment", "laratik_meta_ads_payment")
+
+
+def laratik_meta_ads_invoice_batch() -> None:
+	"""Verify the pinned Meta invoice state synced."""
+	verify_doctype("LaraTik Meta Ads Invoice Batch", "laratik_meta_ads_invoice_batch")
+
+
+def laratik_meta_ads_invoice_line() -> None:
+	"""Verify the chargeable invoice lines synced."""
+	verify_doctype("LaraTik Meta Ads Invoice Line", "laratik_meta_ads_invoice_line")

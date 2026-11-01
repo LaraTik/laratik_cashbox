@@ -10,7 +10,14 @@
   "customer",
   "relationship_kind",
   "fee_percent",
+  "fee_is_configured",
   "fee_rules",
+  "charge_model",
+  "recognition_model",
+  "income_account",
+  "invoice_item",
+  "tax_treatment",
+  "tax_template",
   "invoice_currency",
   "page_assets",
   "disabled"
@@ -49,10 +56,56 @@
    "reqd": 1
   },
   {
+   "fieldname": "fee_is_configured",
+   "fieldtype": "Check",
+   "label": "The Service Fee Above Is Approved",
+   "default": "0",
+   "description": "A zero fee and a fee nobody ever set look identical on the form. Tick this when the fee above is the fee that was agreed."
+  },
+  {
    "fieldname": "fee_rules",
    "fieldtype": "Table",
    "label": "Dated Service Fee Rules",
    "options": "LaraTik Meta Ads Fee Rule"
+  },
+  {
+   "fieldname": "charge_model",
+   "fieldtype": "Select",
+   "label": "What the Invoice Carries",
+   "options": "\nRecharge\nService fee only",
+   "description": "Recharge: the advertising cost and the fee. Service fee only: the fee alone, because the customer funded the advertising. Leave it unset until the accounting policy says which."
+  },
+  {
+   "fieldname": "recognition_model",
+   "fieldtype": "Select",
+   "label": "Who Recognises the Charge",
+   "options": "\nPrincipal\nAgent",
+   "description": "Principal: the recharge is LaraTik's revenue. Agent: the fee is LaraTik's revenue and the advertising cost is the customer's money passing through. Leave it unset until the accounting policy says which."
+  },
+  {
+   "fieldname": "income_account",
+   "fieldtype": "Link",
+   "label": "Income Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "invoice_item",
+   "fieldtype": "Link",
+   "label": "Invoice Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "tax_treatment",
+   "fieldtype": "Select",
+   "label": "Tax Treatment",
+   "options": "\nNone\nTemplate",
+   "description": "None: no tax is charged. Template: the tax template below applies. Leave it unset until the tax treatment is stated."
+  },
+  {
+   "fieldname": "tax_template",
+   "fieldtype": "Link",
+   "label": "Sales Tax Template",
+   "options": "Sales Taxes and Charges Template"
   },
   {
    "fieldname": "invoice_currency",

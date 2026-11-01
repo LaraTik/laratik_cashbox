@@ -97,6 +97,13 @@ def _enqueue_account_sync(account, since, until, job_id: str) -> None:
 
 
 def _has_complete_period_sync(account, since, until) -> bool:
+	# The daily four-day overlap can catch late adjustments before month close.
+	# Only a matched full-period snapshot fetched after that wait is final for
+	# the monthly report.
+	month_close_after = datetime.combine(
+		until + timedelta(days=MONTH_CLOSE_START_DAY),
+		datetime.min.time(),
+	).isoformat(sep=" ")
 	runs = frappe.get_all(
 		"LaraTik Meta Ads Sync",
 		filters={
@@ -104,6 +111,8 @@ def _has_complete_period_sync(account, since, until) -> bool:
 			"ad_account": account.name,
 			"status": "Complete",
 			"ad_insights_status": "Complete",
+			"ad_reconciliation_status": "Matched",
+			"fetched_at": [">=", month_close_after],
 			"from_date": ["<=", since.isoformat()],
 			"to_date": [">=", until.isoformat()],
 		},

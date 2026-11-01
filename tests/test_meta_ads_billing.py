@@ -244,7 +244,11 @@ def test_current_meta_invoice_summary_imports_all_payment_and_ad_credit_sections
     assert parsed["report_row_count"] == 3
     assert parsed["start_date"] == "2025-01-16"
     assert parsed["end_date"] == "2026-10-31"
-    assert parsed["counts"] == {"Payment": 2, "Refund": 0, "Credit": 1, "Unclassified": 0}
+    assert parsed["counts"] == {
+        "Payment": 2, "Refund": 0, "Credit": 1, "Reversal": 0, "Unclassified": 0,
+    }
+    assert parsed["problems"] == []
+    assert parsed["section_totals_verified"] is True
     assert parsed["totals"]["Payment"] == "15"
     assert parsed["totals"]["Credit"] == "0.15"
     assert preview["assignment_status"] == "Unassigned"
@@ -261,8 +265,21 @@ def test_current_meta_invoice_summary_checks_embedded_account_id(billing):
     content = current_meta_invoice_summary(account="act_999")
     encoded = base64.b64encode(content).decode("ascii")
 
+    # The preview REPORTS the problem instead of refusing outright, so the
+    # operator can be told which file and which rule failed.
+    preview = module.preview_billing_report(
+        "Company A", "Meta Account A", "invoice_summary.csv", encoded
+    )
+    codes = [problem["code"] for problem in preview["problems"]]
+    assert "ACCOUNT_MISMATCH" in codes
+    assert preview["can_import"] is False
+
+    # And the import still REFUSES: a file that is not this account's file
+    # is never stored.
     with pytest.raises(FrappeError, match="account ID does not match"):
-        module.preview_billing_report("Company A", "Meta Account A", "invoice_summary.csv", encoded)
+        module.import_billing_report(
+            "Company A", "Meta Account A", "invoice_summary.csv", encoded
+        )
 
     assert fake.inserted == []
     assert fake.saved_files == []
@@ -271,9 +288,19 @@ def test_current_meta_invoice_summary_checks_embedded_account_id(billing):
 def test_current_meta_invoice_summary_rejects_a_section_total_that_does_not_reconcile(billing):
     module, fake = billing
     content = current_meta_invoice_summary(payment_total="15.01")
+    encoded = base64.b64encode(content).decode("ascii")
 
-    with pytest.raises(FrappeError, match="section total does not match"):
-        module._parse_report(content, fake.account)
+    parsed = module._parse_report(content, fake.account)
+    codes = [problem["code"] for problem in parsed["problems"]]
+    assert "SECTION_TOTAL_MISMATCH" in codes
+    assert parsed["section_totals_verified"] is False
+
+    # The file's own rows do not add up to the file's own total, so nothing
+    # of it is stored.
+    with pytest.raises(FrappeError, match="section total"):
+        module.import_billing_report(
+            "Company A", "Meta Account A", "invoice_summary.csv", encoded
+        )
 
     assert fake.inserted == []
     assert fake.saved_files == []
@@ -332,17 +359,41 @@ def test_spend_report_lists_all_company_accounts_while_scoping_selected_report(b
 
 
 @pytest.mark.parametrize(
-    ("csv_bytes", "message"),
+    ("csv_bytes", "code"),
     [
-        (csv_report([("txn-1", "10.00")], "10.00", account="act_999"), "account ID does not match"),
-        (csv_report([("txn-1", "10.00")], "9.00"), "do not match its section total"),
-        (csv_report([("txn-1", "10.00")], "10.00", currency="USD"), "currency does not match"),
+        (csv_report([("txn-1", "10.00")], "10.00", account="act_999"), "ACCOUNT_MISMATCH"),
+        (csv_report([("txn-1", "10.00")], "9.00"), "SECTION_TOTAL_MISMATCH"),
+        (csv_report([("txn-1", "10.00")], "10.00", currency="USD"), "CURRENCY_MISMATCH"),
     ],
 )
-def test_csv_parser_rejects_account_currency_and_section_total_mismatches(billing, csv_bytes, message):
+def test_csv_parser_reports_account_currency_and_section_total_mismatches(billing, csv_bytes, code):
+    """A file that does not reconcile is REPORTED, and it is still refused.
+
+    The parser reads the whole file and says what is wrong with it, so the
+    operator sees every problem instead of the first one. The import stays
+    all-or-nothing: a billing cycle that does not reconcile with its own
+    totals is not partly stored.
+    """
     module, fake = billing
-    with pytest.raises(FrappeError, match=message):
-        module._parse_report(csv_bytes, fake.account)
+    parsed = module._parse_report(csv_bytes, fake.account)
+
+    codes = [problem["code"] for problem in parsed["problems"]]
+    assert code in codes
+    # Only a totals problem makes the file's own totals unverifiable. A wrong
+    # account or a wrong currency is a different fault, and the file's
+    # sections still add up.
+    if code == "SECTION_TOTAL_MISMATCH":
+        assert parsed["section_totals_verified"] is False
+    else:
+        assert parsed["section_totals_verified"] is True
+
+    encoded = base64.b64encode(csv_bytes).decode("ascii")
+    with pytest.raises(FrappeError, match="was not imported"):
+        module.import_billing_report(
+            "Company A", "Meta Account A", "invoice_summary.csv", encoded
+        )
+    assert fake.inserted == []
+    assert fake.saved_files == []
 
 
 def test_exact_duplicate_transaction_ids_inside_csv_are_counted_once_for_import(billing):
@@ -693,3 +744,182 @@ def test_billing_import_history_reports_when_the_batch_limit_is_reached(billing)
 
     assert report["imports_truncated"] is True
     assert len(report["imports"]) == 100
+
+
+# ─── TRACK C: THE SETTLEMENT EVIDENCE ──────────────────────────────────────────
+
+
+def _settlement_report(billing, records):
+    """Read the billing report with the given payment records."""
+    module, fake = billing
+    account = SimpleNamespace(
+        name="Meta Account A",
+        external_account_id="act_123",
+        account_name="Example Ads",
+        currency="EUR",
+        billing_profile="",
+    )
+
+    def payment_row(name, amount, kind, method):
+        return SimpleNamespace(
+            name=name,
+            import_batch="IMPORT-1",
+            ad_account=account.name,
+            external_account_id=account.external_account_id,
+            billing_profile_snapshot="",
+            billing_customer_snapshot="",
+            relationship_kind_snapshot="",
+            fee_percent_snapshot="",
+            invoice_currency_snapshot="",
+            page_assets_snapshot="[]",
+            transaction_date="2026-10-02",
+            transaction_id=name,
+            amount=amount,
+            currency="EUR",
+            payment_method=method,
+            record_kind=kind,
+            source="Meta invoice summary CSV",
+            imported_at="2026-10-28 12:00:00",
+        )
+
+    def get_all(doctype, **_kwargs):
+        if doctype == "LaraTik Meta Ads Account":
+            return [account]
+        if doctype == "LaraTik Meta Ads Payment":
+            return list(records)
+        if doctype == "LaraTik Meta Ads Payment Import":
+            return []
+        raise AssertionError(f"Unexpected get_all({doctype!r})")
+
+    fake.get_all = get_all
+    return module.get_billing_report("Company A", "2026-10-01", "2026-10-31")
+
+
+def test_the_settlement_evidence_is_reported_and_classified(billing):
+    module, _fake = billing
+    report = _settlement_report(billing, [])
+    settlement = report["settlement"]
+
+    assert settlement["status"] == "No evidence"
+    assert settlement["record_count"] == 0
+    # And it says what it is NOT.
+    assert "not delivery spend" in settlement["note"]
+
+
+def test_a_refund_and_a_credit_reduce_the_settlement_position(billing):
+    # Money coming BACK reduces what LaraTik settled. A settlement figure
+    # that ignored the refunds would overstate what was paid.
+    module, fake = billing
+    account = SimpleNamespace(
+        name="Meta Account A",
+        external_account_id="act_123",
+        account_name="Example Ads",
+        currency="EUR",
+        billing_profile="",
+    )
+
+    def row(name, amount, kind, method):
+        return SimpleNamespace(
+            name=name,
+            import_batch="IMPORT-1",
+            ad_account=account.name,
+            external_account_id=account.external_account_id,
+            billing_profile_snapshot="",
+            billing_customer_snapshot="",
+            relationship_kind_snapshot="",
+            fee_percent_snapshot="",
+            invoice_currency_snapshot="",
+            page_assets_snapshot="[]",
+            transaction_date="2026-10-02",
+            transaction_id=name,
+            amount=amount,
+            currency="EUR",
+            payment_method=method,
+            record_kind=kind,
+            source="Meta invoice summary CSV",
+            imported_at="2026-10-28 12:00:00",
+        )
+
+    records = [
+        row("PAY-1", "130.32", "Payment", "Mastercard"),
+        row("PAY-2", "1669.67", "Payment", "Visa"),
+        row("REF-1", "20.00", "Refund", "Refund"),
+        row("CR-1", "5.00", "Credit", "Ad credit"),
+    ]
+
+    def get_all(doctype, **_kwargs):
+        if doctype == "LaraTik Meta Ads Account":
+            return [account]
+        if doctype == "LaraTik Meta Ads Payment":
+            return records
+        if doctype == "LaraTik Meta Ads Payment Import":
+            return []
+        raise AssertionError(f"Unexpected get_all({doctype!r})")
+
+    fake.get_all = get_all
+    settlement = module.get_billing_report("Company A", "2026-10-01", "2026-10-31")["settlement"]
+
+    assert settlement["status"] == "Evidence available"
+    assert settlement["record_count"] == 4
+    assert settlement["payments"] == {"EUR": "1799.99"}
+    assert settlement["refunds"] == {"EUR": "20.00"}
+    assert settlement["credits"] == {"EUR": "5.00"}
+    # 130.32 + 1669.67 - 20.00 - 5.00
+    assert settlement["net"] == {"EUR": "1774.99"}
+
+
+def test_an_unclassified_record_is_flagged_for_review_and_keeps_its_sign(billing):
+    # An unclassified record is not a known direction. Inventing one would be
+    # inventing a settlement.
+    module, fake = billing
+    account = SimpleNamespace(
+        name="Meta Account A",
+        external_account_id="act_123",
+        account_name="Example Ads",
+        currency="EUR",
+        billing_profile="",
+    )
+
+    def row(name, amount, kind, method):
+        return SimpleNamespace(
+            name=name,
+            import_batch="IMPORT-1",
+            ad_account=account.name,
+            external_account_id=account.external_account_id,
+            billing_profile_snapshot="",
+            billing_customer_snapshot="",
+            relationship_kind_snapshot="",
+            fee_percent_snapshot="",
+            invoice_currency_snapshot="",
+            page_assets_snapshot="[]",
+            transaction_date="2026-10-02",
+            transaction_id=name,
+            amount=amount,
+            currency="EUR",
+            payment_method=method,
+            record_kind=kind,
+            source="Meta invoice summary CSV",
+            imported_at="2026-10-28 12:00:00",
+        )
+
+    records = [
+        row("PAY-1", "100.00", "Payment", "Mastercard"),
+        row("UNK-1", "7.00", "Unclassified", "Transfer"),
+    ]
+
+    def get_all(doctype, **_kwargs):
+        if doctype == "LaraTik Meta Ads Account":
+            return [account]
+        if doctype == "LaraTik Meta Ads Payment":
+            return records
+        if doctype == "LaraTik Meta Ads Payment Import":
+            return []
+        raise AssertionError(f"Unexpected get_all({doctype!r})")
+
+    fake.get_all = get_all
+    settlement = module.get_billing_report("Company A", "2026-10-01", "2026-10-31")["settlement"]
+
+    assert settlement["unclassified"] == {"EUR": "7.00"}
+    assert settlement["unclassified_count"] == 1
+    assert settlement["requires_review"] is True
+    assert settlement["net"] == {"EUR": "107.00"}

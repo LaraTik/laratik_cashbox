@@ -1,0 +1,139 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-11-02 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "invoice_batch",
+  "company",
+  "ad_account",
+  "external_account_id",
+  "basis_currency",
+  "basis_amount",
+  "fee_percent",
+  "fee_amount",
+  "charge_amount",
+  "invoice_currency",
+  "exchange_rate",
+  "exchange_rate_date",
+  "exchange_rate_source",
+  "source_sync",
+  "page_assets_snapshot"
+ ],
+ "fields": [
+  {
+   "fieldname": "invoice_batch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Invoice Batch",
+   "options": "LaraTik Meta Ads Invoice Batch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ad_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Meta Ad Account",
+   "options": "LaraTik Meta Ads Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "external_account_id",
+   "fieldtype": "Data",
+   "label": "Meta Account ID"
+  },
+  {
+   "fieldname": "basis_currency",
+   "fieldtype": "Link",
+   "label": "Advertising Cost Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "basis_amount",
+   "fieldtype": "Data",
+   "label": "Advertising Cost"
+  },
+  {
+   "fieldname": "fee_percent",
+   "fieldtype": "Data",
+   "label": "Service Fee Percent"
+  },
+  {
+   "fieldname": "fee_amount",
+   "fieldtype": "Data",
+   "label": "Service Fee"
+  },
+  {
+   "fieldname": "charge_amount",
+   "fieldtype": "Data",
+   "label": "Invoice Amount"
+  },
+  {
+   "fieldname": "invoice_currency",
+   "fieldtype": "Link",
+   "label": "Invoice Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "exchange_rate",
+   "fieldtype": "Data",
+   "label": "Exchange Rate"
+  },
+  {
+   "fieldname": "exchange_rate_date",
+   "fieldtype": "Date",
+   "label": "Exchange Rate Date"
+  },
+  {
+   "fieldname": "exchange_rate_source",
+   "fieldtype": "Data",
+   "label": "Exchange Rate Source"
+  },
+  {
+   "fieldname": "source_sync",
+   "fieldtype": "Data",
+   "label": "Source Sync Run"
+  },
+  {
+   "fieldname": "page_assets_snapshot",
+   "fieldtype": "Code",
+   "label": "Pages Snapshot",
+   "options": "JSON"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LaraTik Cashbox",
+ "name": "LaraTik Meta Ads Invoice Line",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "System Manager",
+   "share": 0,
+   "write": 0,
+   "amend": 0,
+   "cancel": 0,
+   "submit": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

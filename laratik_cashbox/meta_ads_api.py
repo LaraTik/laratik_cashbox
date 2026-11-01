@@ -14,6 +14,9 @@ import frappe
 import requests
 from frappe.utils import getdate, now_datetime
 
+from laratik_cashbox import meta_ads_chargeability as chargeability
+from laratik_cashbox import meta_ads_invoicing as invoicing
+
 
 META_TIMEOUT_SECONDS = 30
 MAX_DAYS = 366
@@ -69,6 +72,30 @@ def get_dashboard_setup(company):
         order_by="name asc",
         limit_page_length=500,
     )
+    # The ACCOUNTING POLICY links. They are Link fields, so the reader picks a
+    # record out of a list read from ERPNext; a free-text box would only look
+    # like a link field, and a name typed by hand is a name nobody validated.
+    income_accounts = frappe.get_all(
+        "Account",
+        filters={"company": company_name, "is_group": 0, "account_type": "Income Account", "disabled": 0},
+        fields=["name", "account_name"],
+        order_by="account_name asc",
+        limit_page_length=500,
+    )
+    invoice_items = frappe.get_all(
+        "Item",
+        filters={"disabled": 0, "is_stock_item": 0},
+        fields=["name", "item_name"],
+        order_by="item_name asc",
+        limit_page_length=500,
+    )
+    tax_templates = frappe.get_all(
+        "Sales Taxes and Charges Template",
+        filters={"disabled": 0},
+        fields=["name", "title"],
+        order_by="name asc",
+        limit_page_length=200,
+    )
     return {
         "company": company_name,
         "connections": connections,
@@ -76,6 +103,9 @@ def get_dashboard_setup(company):
         "profiles": profiles,
         "customers": customers,
         "currencies": currencies,
+        "income_accounts": income_accounts,
+        "invoice_items": invoice_items,
+        "tax_templates": tax_templates,
         "truncated": len(accounts) >= MAX_ACCOUNTS or len(customers) >= 5000 or profiles_truncated,
     }
 
@@ -298,6 +328,112 @@ def save_billing_fee_rules(company, profile_name, fee_rules):
 
 
 @frappe.whitelist(methods=["POST"])
+def save_billing_policy(company, profile_name, charge_model=None, recognition_model=None,
+                        income_account=None, invoice_item=None, tax_treatment=None,
+                        tax_template=None, fee_is_configured=None):
+    """Record the ACCOUNTING POLICY a billing profile runs under.
+
+    ─── ADR-232: A POLICY ANSWER IS A FIELD NOBODY FILLED IN ──────────────────
+
+    An UNSET field means "not decided". It is never defaulted here, and the app
+    never picks one: a profile whose policy is unanswered cannot produce a
+    draft, and that is the intended behaviour, not a defect.
+
+    So this endpoint knows THREE states, and the difference between them is the
+    whole point of it:
+
+    - NOT PROVIDED (`None`) — the caller is not answering this question. The
+      stored answer is left exactly as it was, so a caller that answers ONE
+      question does not silently clear the other six.
+    - PROVIDED AND EMPTY (`""`) — the reader explicitly chose "not decided".
+      The field is CLEARED, so the profile goes back to being undecided.
+    - PROVIDED WITH A VALUE — the answer is checked against the CLOSED
+      vocabulary the invoice workflow reads, and stored.
+
+    The transport makes the first two distinguishable: the web app sends a JSON
+    body, so an absent key stays absent and an empty string stays an empty
+    string. Nothing here has to guess which one it was handed.
+
+    ─── WHY THE VOCABULARY IS IMPORTED, NOT RE-TYPED ──────────────────────────
+
+    `meta_ads_invoicing` owns the three vocabularies — the charge models, the
+    recognition models and the tax treatments — and the invoice workflow reads
+    the same constants to decide whether a period is ready. A second, typed-out
+    copy of those lists would be a second answer to "what may be chosen here",
+    and the two could drift apart without anything noticing.
+    """
+    _require_admin()
+    company_name = _company_name(company)
+    profile = frappe.get_doc("LaraTik Meta Ads Billing Profile", _text(profile_name, "Billing profile", 140))
+    profile.check_permission("write")
+    if profile.company != company_name:
+        frappe.throw("The billing profile belongs to another Company.")
+
+    charge = _policy_choice(charge_model, "Charge model", invoicing.CHARGE_MODELS)
+    if charge is not None:
+        profile.charge_model = charge
+
+    recognition = _policy_choice(recognition_model, "Recognition model", invoicing.RECOGNITION_MODELS)
+    if recognition is not None:
+        profile.recognition_model = recognition
+
+    treatment = _policy_choice(tax_treatment, "Tax treatment", invoicing.TAX_TREATMENTS)
+    if treatment is not None:
+        profile.tax_treatment = treatment
+
+    if income_account is not None:
+        account_name = _text(income_account, "Income account", 140)
+        if account_name:
+            account = frappe.db.get_value("Account", account_name, ["company", "disabled"], as_dict=True)
+            if not account:
+                frappe.throw("Choose an existing income Account.")
+            if account.get("disabled"):
+                frappe.throw("Choose an enabled income Account.")
+            if account.get("company") != company_name:
+                frappe.throw("The income Account belongs to another Company.")
+        profile.income_account = account_name
+
+    if invoice_item is not None:
+        item_name = _text(invoice_item, "Invoice item", 140)
+        if item_name:
+            item = frappe.db.get_value("Item", item_name, ["disabled"], as_dict=True)
+            if not item:
+                frappe.throw("Choose an existing invoice Item.")
+            if item.get("disabled"):
+                frappe.throw("Choose an enabled invoice Item.")
+        profile.invoice_item = item_name
+
+    if tax_template is not None:
+        template_name = _text(tax_template, "Tax template", 140)
+        if template_name:
+            template = frappe.db.get_value(
+                "Sales Taxes and Charges Template", template_name, ["company", "disabled"], as_dict=True
+            )
+            if not template:
+                frappe.throw("Choose an existing Sales Taxes and Charges Template.")
+            if template.get("disabled"):
+                frappe.throw("Choose an enabled Sales Taxes and Charges Template.")
+            if template.get("company") and template.get("company") != company_name:
+                frappe.throw("The tax template belongs to another Company.")
+        profile.tax_template = template_name
+
+    if fee_is_configured is not None:
+        profile.fee_is_configured = _check_flag(fee_is_configured)
+
+    profile.save()
+    return {
+        "profile": profile.name,
+        "charge_model": profile.charge_model or "",
+        "recognition_model": profile.recognition_model or "",
+        "income_account": profile.income_account or "",
+        "invoice_item": profile.invoice_item or "",
+        "tax_treatment": profile.tax_treatment or "",
+        "tax_template": profile.tax_template or "",
+        "fee_is_configured": int(bool(profile.fee_is_configured)),
+    }
+
+
+@frappe.whitelist(methods=["POST"])
 def map_ad_account(company, account_name, profile_name):
     """Map one company-scoped Meta ad account to a configured billing profile."""
     _require_admin()
@@ -389,7 +525,13 @@ def sync_spend(company, since, until, account_name=None):
                 row.billing_profile = profile_name
                 row.billing_customer_snapshot = profile_snapshot["customer"] if profile_snapshot else None
                 row.relationship_kind_snapshot = profile_snapshot["relationship_kind"] if profile_snapshot else None
-                row.fee_percent_snapshot = _fee_percent_for_date(profile_snapshot, spend_date) if profile_snapshot else None
+                if profile_snapshot:
+                    row.fee_status_snapshot, row.fee_percent_snapshot = _fee_status_for_date(
+                        profile_snapshot, spend_date
+                    )
+                else:
+                    row.fee_status_snapshot = None
+                    row.fee_percent_snapshot = None
                 row.invoice_currency_snapshot = profile_snapshot["invoice_currency"] if profile_snapshot else None
                 row.page_assets_snapshot = json.dumps(profile_snapshot["page_assets"], ensure_ascii=False) if profile_snapshot else "[]"
                 row.spend_date = spend_date
@@ -447,7 +589,13 @@ def sync_spend(company, since, until, account_name=None):
                     row.billing_profile = ad_profile_snapshot["name"] if ad_profile_snapshot else None
                     row.billing_customer_snapshot = ad_profile_snapshot["customer"] if ad_profile_snapshot else None
                     row.relationship_kind_snapshot = ad_profile_snapshot["relationship_kind"] if ad_profile_snapshot else None
-                    row.fee_percent_snapshot = _fee_percent_for_date(ad_profile_snapshot, ad_row["spend_date"]) if ad_profile_snapshot else None
+                    if ad_profile_snapshot:
+                        row.fee_status_snapshot, row.fee_percent_snapshot = _fee_status_for_date(
+                            ad_profile_snapshot, ad_row["spend_date"]
+                        )
+                    else:
+                        row.fee_status_snapshot = None
+                        row.fee_percent_snapshot = None
                     row.invoice_currency_snapshot = ad_profile_snapshot["invoice_currency"] if ad_profile_snapshot else None
                     row.page_assets_snapshot = json.dumps(asset_rows, ensure_ascii=False)
                     row.spend_date = ad_row["spend_date"]
@@ -521,11 +669,85 @@ def sync_spend(company, since, until, account_name=None):
 
 
 @frappe.whitelist(methods=["GET"])
-def get_spend_report(company, since, until, account_name=None):
-    """Read a company-scoped daily ledger and compute exact, dated billing previews."""
+def get_meta_ads_context(company):
+    """The workspace scope: company, reporting currency, accounts, last sync.
+
+    ─── WHY THIS IS ONE CHEAP READ AND NOT THE SPEND REPORT ─────────────────────
+
+    Every section of the Meta Ads workspace has to state the SAME scope: the
+    company, the currency the report is read in, the accounts it covers, and
+    when the data was last synchronised. Before this method, each section
+    built that scope from whichever report it happened to read — so the
+    account selector vanished on the settlement screen, because that screen
+    read the billing report and the billing report does not carry the
+    account's sync state.
+
+    A control that disappears when the reader changes tabs reads as a
+    statement about the DATA. It is a statement about the LAYOUT, and this
+    read removes it: one small query over the account records, no Insights
+    rows, no ad-level spend, no reconciliation — and every section states the
+    same scope from it.
+    """
     _require_admin()
     company_name = _company_name(company)
-    start, end = _date_range(since, until)
+    rows = frappe.get_all(
+        "LaraTik Meta Ads Account",
+        filters={"company": company_name},
+        fields=[
+            "name", "external_account_id", "account_name", "currency", "timezone",
+            "status", "last_sync_at", "last_sync_status",
+        ],
+        order_by="account_name asc",
+        limit_page_length=MAX_ACCOUNTS + 1,
+    )
+    truncated = len(rows) > MAX_ACCOUNTS
+    rows = rows[:MAX_ACCOUNTS]
+
+    latest_sync_at = ""
+    latest_sync_status = ""
+    for row in rows:
+        if (row.last_sync_status or "") != "Complete":
+            continue
+        fetched = str(row.last_sync_at or "")
+        if fetched > latest_sync_at:
+            latest_sync_at = fetched
+            latest_sync_status = row.last_sync_status or ""
+
+    return {
+        "company": company_name,
+        "reporting_currency": frappe.db.get_value("Company", company_name, "default_currency") or "",
+        "accounts": [
+            {
+                "name": row.name,
+                "external_account_id": row.external_account_id or "",
+                "account_name": row.account_name or "",
+                "currency": row.currency or "",
+                "timezone": row.timezone or "",
+                "status": row.status or "",
+                "last_sync_at": str(row.last_sync_at or ""),
+                "last_sync_status": row.last_sync_status or "",
+            }
+            for row in rows
+        ],
+        "accounts_truncated": truncated,
+        "last_sync_at": latest_sync_at,
+        "last_sync_status": latest_sync_status,
+    }
+
+
+def _period_accounts(company_name, start, end, account_name=None):
+    """The company's ad accounts, and the sync runs that completed for them.
+
+    ─── WHY THIS IS A NAMED FUNCTION ───────────────────────────────────────────
+
+    The customer invoice workspace reads the same period the spend report
+    reads, and it has to reach the same accounts and the same completed runs.
+    Two copies of this query would be two answers to "which spend does this
+    period hold", and a report that says one thing while an invoice says
+    another is a reconciliation nobody can close.
+
+    So the selection lives here, once, and both callers use it.
+    """
     account_filters = {"company": company_name}
     account_fields = [
         "name", "external_account_id", "account_name", "currency", "timezone",
@@ -582,7 +804,33 @@ def get_spend_report(company, since, until, account_name=None):
     complete_by_account = {}
     for run in complete_runs:
         complete_by_account.setdefault(run.external_account_id, run)
-    selected_run_names = [run.name for run in complete_by_account.values()]
+
+    return {
+        "accounts": account_rows,
+        "selected_account_name": selected.name if account_name else "",
+        "account_options": account_option_rows,
+        "account_options_truncated": account_options_truncated,
+        "accounts_truncated": accounts_truncated,
+        "complete_by_account": complete_by_account,
+        "runs_truncated": runs_truncated,
+        "selected_run_names": [run.name for run in complete_by_account.values()],
+    }
+
+
+@frappe.whitelist(methods=["GET"])
+def get_spend_report(company, since, until, account_name=None):
+    """Read a company-scoped daily ledger and compute exact, dated billing previews."""
+    _require_admin()
+    company_name = _company_name(company)
+    start, end = _date_range(since, until)
+    period = _period_accounts(company_name, start, end, account_name)
+    account_rows = period["accounts"]
+    account_option_rows = period["account_options"]
+    account_options_truncated = period["account_options_truncated"]
+    accounts_truncated = period["accounts_truncated"]
+    complete_by_account = period["complete_by_account"]
+    runs_truncated = period["runs_truncated"]
+    selected_run_names = period["selected_run_names"]
 
     spend_rows = []
     if selected_run_names:
@@ -606,26 +854,9 @@ def get_spend_report(company, since, until, account_name=None):
     rows_truncated = len(spend_rows) > MAX_DAILY_ROWS
     spend_rows = spend_rows[:MAX_DAILY_ROWS]
 
-    ad_spend_rows = []
-    if selected_run_names:
-        ad_spend_rows = frappe.get_all(
-            "LaraTik Meta Ads Spend",
-            filters={
-                "company": company_name,
-                "level": "Ad",
-                "spend_date": ["between", [start.isoformat(), end.isoformat()]],
-                "sync_run": ["in", selected_run_names],
-                **({"ad_account": selected.name} if account_name else {}),
-            },
-            fields=[
-                "level", "sync_run", "ad_account", "external_account_id", "billing_profile", "campaign_id",
-                "billing_customer_snapshot", "relationship_kind_snapshot", "fee_percent_snapshot",
-                "invoice_currency_snapshot", "page_asset_snapshot", "spend_date", "ad_id", "amount",
-                "currency", "attribution_status", "page_id", "page_name", "instagram_actor_id",
-            ],
-            order_by="spend_date asc, ad_account asc, ad_id asc",
-            limit_page_length=MAX_AD_INSIGHT_ROWS + 1,
-        )
+    ad_spend_rows = _period_ad_spend_rows(
+        company_name, start, end, selected_run_names, period["selected_account_name"]
+    )
     ad_rows_truncated = len(ad_spend_rows) > MAX_AD_INSIGHT_ROWS
     ad_spend_rows = ad_spend_rows[:MAX_AD_INSIGHT_ROWS]
 
@@ -670,8 +901,8 @@ def get_spend_report(company, since, until, account_name=None):
             continue
         try:
             amount = _decimal(raw.amount)
-            currency = _currency_code(raw.currency)
-            if amount < 0 or currency != account.currency:
+            currency = _stored_currency_code(raw.currency)
+            if amount < 0 or not currency or currency != account.currency:
                 raise ValueError("Daily spend currency or sign is invalid.")
         except (ValueError, InvalidOperation, TypeError):
             unreadable_count += 1
@@ -695,8 +926,26 @@ def get_spend_report(company, since, until, account_name=None):
         account.name: complete_by_account.get(account.external_account_id)
         for account in account_rows
     }
-    raw_billable_groups, billing_unreadable_count = _collect_ad_billable_groups(
+    billable_rows, billing_unreadable_count = _billable_ad_rows(
         ad_spend_rows, account_by_name, run_by_account
+    )
+    raw_billable_groups, billing_unreadable_count = _collect_ad_billable_groups(
+        billable_rows, billing_unreadable_count
+    )
+    # THE SWITCHED-OFF BUCKET.
+    #
+    # A disabled payer arrangement is a DECISION: those Pages are not charged.
+    # Before, their spend fell into the unassigned bucket — the same number as
+    # spend whose Page nobody has ever mapped. One is a decision and the other
+    # is a gap, and the brief is explicit that they must not be treated as
+    # financially equivalent.
+    #
+    # So the disabled arrangements' Pages are re-matched against the stored
+    # UNMAPPED rows, and their spend is held apart. The stored data is not
+    # touched; only the reading of it changes.
+    non_billable_assets = _non_billable_page_assets(company_name) if ad_spend_rows else []
+    not_billable_totals, _not_billable_pages = _collect_non_billable_spend(
+        ad_spend_rows, account_by_name, run_by_account, non_billable_assets
     )
     all_accounts_synced = bool(account_rows) and all(
         account_status[account.name] == "Complete" for account in account_rows
@@ -718,6 +967,26 @@ def get_spend_report(company, since, until, account_name=None):
             billable_totals[currency] = billable_totals.get(currency, Decimal(0)) + amount
     if any(amount > spend_by_currency.get(currency, Decimal(0)) for currency, amount in billable_totals.items()):
         billing_ready = False
+    # The billable and the switched-off buckets are held against the SAME
+    # account-level spend, so the two together must never exceed it. If they
+    # do, the split is not trustworthy and the whole report withholds it.
+    for currency, amount in billable_totals.items():
+        held = amount + not_billable_totals.get(currency, Decimal(0))
+        if held > spend_by_currency.get(currency, Decimal(0)):
+            billing_ready = False
+
+    # THE POLICY, per profile. Which of the two charge models this profile
+    # runs under is a COMMERCIAL and ACCOUNTING decision somebody has to
+    # make, and the app must not make it: the brief says the principal/agent
+    # and fee-only/recharge questions "must remain configurable and subject
+    # to approved accounting policy".
+    #
+    # So the policy is READ, never guessed. An undecided profile reports no
+    # invoice amount at all — and says why — rather than quietly showing the
+    # recharge figure as though it had been settled.
+    profile_policies = _profile_policies(
+        company_name, {bucket["name"] for bucket in raw_billable_groups.values()}
+    )
 
     billing_groups = []
     unassigned_by_currency = dict(spend_by_currency)
@@ -730,6 +999,15 @@ def get_spend_report(company, since, until, account_name=None):
             fx = []
             charge_total = Decimal(0)
             conversion_complete = bool(invoice_currency)
+            # WHY a group cannot be invoiced, if it cannot. The state is named
+            # by the ONE rule, so the reason and the state cannot disagree.
+            blocked_reason = ""
+            if not invoice_currency:
+                blocked_reason = chargeability.CHARGEABILITY_REASON_BILLING_CURRENCY_MISSING
+            charge_model = profile_policies.get(bucket["name"], {}).get("charge_model") or ""
+            # The CHARGE MODEL decides what the invoice carries, and an
+            # undecided model means the amount is not computed at all.
+            charge_model_decided = charge_model in invoicing.CHARGE_MODELS
             for source_currency, amount in sorted(amounts.items()):
                 source_precision = _currency_precision(source_currency)
                 fee = _quantize(amount * fee_percent / Decimal(100), source_precision) if source_precision is not None else None
@@ -737,27 +1015,66 @@ def get_spend_report(company, since, until, account_name=None):
                 rate, rate_date = _selling_rate(source_currency, invoice_currency, end)
                 if rate is None or source_precision is None:
                     conversion_complete = False
+                    if not blocked_reason:
+                        blocked_reason = (
+                            chargeability.CHARGEABILITY_REASON_EXCHANGE_RATE_MISSING
+                            if rate is None
+                            else chargeability.CHARGEABILITY_REASON_CURRENCY_PRECISION_UNKNOWN
+                        )
                     fx.append({"from": source_currency, "to": invoice_currency, "rate": None, "date": None})
                     continue
-                charge_total += amount * (Decimal(1) + fee_percent / Decimal(100)) * rate
                 fx.append({"from": source_currency, "to": invoice_currency, "rate": format(rate, "f"), "date": rate_date})
+                if not charge_model_decided:
+                    continue
+                # The charge, in the ACCOUNT's currency, per the model:
+                #   Recharge          → the advertising cost AND the fee;
+                #   Service fee only  → the fee ALONE, because the advertising
+                #                     cost is the customer's own money.
+                if charge_model == invoicing.CHARGE_MODEL_RECHARGE:
+                    charge_in_source = amount + (fee if fee is not None else Decimal(0))
+                else:
+                    charge_in_source = fee if fee is not None else Decimal(0)
+                charge_total += charge_in_source * rate
             invoice_precision = _currency_precision(invoice_currency) if invoice_currency else None
             if invoice_precision is None:
                 conversion_complete = False
-            invoice_amount = _quantize(charge_total, invoice_precision) if conversion_complete else None
+                if not blocked_reason:
+                    blocked_reason = chargeability.CHARGEABILITY_REASON_CURRENCY_PRECISION_UNKNOWN
+            invoice_amount = _quantize(charge_total, invoice_precision) if conversion_complete and charge_model_decided else None
+            # WHY there is no invoice amount, when there is none. The screen
+            # shows this next to the empty cell, so a reader is never left
+            # guessing whether the period is empty or undecided.
+            invoice_amount_reason = ""
+            if not charge_model_decided:
+                invoice_amount_reason = invoicing.NEEDS_APPROVAL_REASON_CHARGE_MODEL_NOT_DECIDED
+            elif not conversion_complete:
+                invoice_amount_reason = blocked_reason
+            state, reason = chargeability.classify_chargeability({
+                "attribution_status": chargeability.ATTRIBUTION_STATUS_ATTRIBUTED,
+                "blocked_reason": blocked_reason,
+            })
             billing_groups.append({
                 "key": group_key,
                 **{key: value for key, value in bucket.items() if key != "source_spend"},
                 "source_spend": {currency: format(amount, "f") for currency, amount in sorted(amounts.items())},
                 "service_fee": fees_by_currency,
+                "charge_model": charge_model,
                 "invoice_amount": format(invoice_amount, "f") if invoice_amount is not None else None,
+                "invoice_amount_reason": invoice_amount_reason,
                 "fx": fx,
+                "chargeability": state,
+                "chargeability_reason": reason,
             })
     if billing_ready:
         for currency, amount in billable_totals.items():
             unassigned_by_currency[currency] = unassigned_by_currency.get(currency, Decimal(0)) - amount
+        # The switched-off spend leaves the UNASSIGNED bucket. It is not
+        # unassigned: it is assigned, and deliberately not charged.
+        for currency, amount in not_billable_totals.items():
+            unassigned_by_currency[currency] = unassigned_by_currency.get(currency, Decimal(0)) - amount
     else:
         billing_groups = []
+        not_billable_totals = {}
 
     complete = all_accounts_synced and not accounts_truncated and not runs_truncated and not rows_truncated and unreadable_count == 0
     return {
@@ -775,14 +1092,71 @@ def get_spend_report(company, since, until, account_name=None):
         "spend_by_currency": {currency: format(amount, "f") for currency, amount in sorted(spend_by_currency.items())},
         "billing_groups": sorted(billing_groups, key=lambda row: row["customer_name"].casefold()),
         "unassigned_spend": {currency: format(amount, "f") for currency, amount in sorted(unassigned_by_currency.items()) if amount > 0},
+        "not_billable_spend": {currency: format(amount, "f") for currency, amount in sorted(not_billable_totals.items()) if amount > 0},
         "source_label": META_SOURCE,
         "charge_evidence_label": "Insights spend; not a Meta payment receipt",
     }
 
 
-def _collect_ad_billable_groups(ad_rows, account_by_name, run_by_account):
-    """Group only ad rows whose creative matched one saved Page and payer profile."""
-    groups = {}
+def _period_ad_spend_rows(company_name, start, end, selected_run_names, account_name=None):
+    """The ad-level spend rows of a period, from the runs that completed.
+
+    ─── WHY THIS IS A NAMED FUNCTION ───────────────────────────────────────────
+
+    The customer invoice workspace needs the SAME ad rows the spend report
+    reads, for the same period, and it has to be certain they are the same
+    ones. Two copies of this query would be two answers to "which spend does
+    this period hold", and a report that says €1,000 while an invoice says
+    €1,100 is a reconciliation nobody can close.
+
+    So the query lives here, once, and both callers use it.
+    """
+    if not selected_run_names:
+        return []
+    return frappe.get_all(
+        "LaraTik Meta Ads Spend",
+        filters={
+            "company": company_name,
+            "level": "Ad",
+            "spend_date": ["between", [start.isoformat(), end.isoformat()]],
+            "sync_run": ["in", selected_run_names],
+            **({"ad_account": account_name} if account_name else {}),
+        },
+        fields=[
+            "level", "sync_run", "ad_account", "external_account_id", "billing_profile", "campaign_id",
+            "billing_customer_snapshot", "relationship_kind_snapshot", "fee_percent_snapshot",
+            "fee_status_snapshot", "invoice_currency_snapshot", "page_asset_snapshot",
+            "spend_date", "ad_id", "amount",
+            "currency", "attribution_status", "page_id", "page_name", "instagram_actor_id",
+        ],
+        order_by="spend_date asc, ad_account asc, ad_id asc",
+        limit_page_length=MAX_AD_INSIGHT_ROWS + 1,
+    )
+
+
+def _billable_ad_rows(ad_rows, account_by_name, run_by_account):
+    """The ad rows that are BILLABLE, normalised, with the unreadable count.
+
+    ─── WHY ONE IMPLEMENTATION ─────────────────────────────────────────────────
+
+    "Which spend may be charged" is a money question, so it gets ONE answer.
+    The spend report groups these rows for the payer table; the invoice
+    workspace groups them for the invoice lines. If the two disagreed about a
+    single row, the invoice would not be the invoice of the report.
+
+    A row is billable when all of these hold:
+
+      - it belongs to a run that COMPLETED for that account;
+      - its currency is the account's own currency, and its amount is not
+        negative;
+      - it is an AD row with an ad id;
+      - its attribution status is ATTRIBUTED — an unmapped or ambiguous Page
+        is never silently allocated (ADR-228);
+      - its creative matched a SAVED Page, and that Page's identity does not
+        conflict with the ad row's own identity;
+      - its payer snapshot is complete.
+    """
+    rows = []
     unreadable = 0
     for raw in ad_rows:
         account = account_by_name.get(raw.ad_account)
@@ -795,8 +1169,8 @@ def _collect_ad_billable_groups(ad_rows, account_by_name, run_by_account):
             continue
         try:
             amount = _decimal(raw.amount)
-            currency = _currency_code(raw.currency)
-            if amount < 0 or currency != account.currency or not raw.ad_id:
+            currency = _stored_currency_code(raw.currency)
+            if amount < 0 or not currency or currency != account.currency or not raw.ad_id:
                 raise ValueError("Stored ad spend is invalid.")
         except (InvalidOperation, TypeError, ValueError):
             unreadable += 1
@@ -825,30 +1199,148 @@ def _collect_ad_billable_groups(ad_rows, account_by_name, run_by_account):
             profile_name = _text(raw.billing_profile or "", "Billing profile", 140)
             customer = _text(raw.billing_customer_snapshot or "", "Billing Customer", 140)
             fee_percent = _decimal(raw.fee_percent_snapshot or "")
-            invoice_currency = _currency_code(raw.invoice_currency_snapshot or "")
+            invoice_currency = _stored_currency_code(raw.invoice_currency_snapshot)
+            # The fee STATUS travels with the percent. A snapshot written
+            # before the status existed carries no status, and an absent
+            # status is read conservatively: a fee that is not zero was
+            # stated, and a fee that IS zero was nobody's decision.
+            fee_status = (raw.fee_status_snapshot or "").strip()
+            if not fee_status:
+                fee_status = (
+                    invoicing.FEE_STATUS_CONFIGURED
+                    if fee_percent != 0
+                    else invoicing.FEE_STATUS_UNCONFIGURED
+                )
+            if fee_status not in invoicing.FEE_STATUSES:
+                raise ValueError("The stored fee status is not one this application knows.")
             if not profile_name or not customer or fee_percent < 0 or fee_percent > 100:
                 raise ValueError("The Page's payer snapshot is incomplete.")
         except (InvalidOperation, TypeError, ValueError):
             unreadable += 1
             continue
 
+        rows.append({
+            "account": account.name,
+            "external_account_id": account.external_account_id,
+            "account_name": account.account_name,
+            "currency": currency,
+            "amount": amount,
+            "profile": profile_name,
+            "customer": customer,
+            "relationship_kind": raw.relationship_kind_snapshot or "Customer",
+            "fee_percent": fee_percent,
+            "fee_status": fee_status,
+            "invoice_currency": invoice_currency,
+            "page_asset": page_asset,
+            "sync_run": raw.sync_run,
+            "ad_id": raw.ad_id,
+        })
+    return rows, unreadable
+
+
+def _collect_ad_billable_groups(billable_rows, unreadable):
+    """Group the billable ad rows by payer arrangement.
+
+    The rows arrive already filtered and normalised by `_billable_ad_rows`, so
+    this function only decides the GROUPS. It never decides what is billable:
+    that answer belongs to one place, and the invoice workspace reads it too.
+    """
+    groups = {}
+    for row in billable_rows:
+        profile_name = row["profile"]
+        customer = row["customer"]
+        fee_percent = row["fee_percent"]
+        invoice_currency = row["invoice_currency"]
         group_key = "|".join((profile_name, customer, format(fee_percent, "f"), invoice_currency))
         group = groups.setdefault(group_key, {
             "name": profile_name,
             "customer": customer,
             "customer_name": frappe.db.get_value("Customer", customer, "customer_name") or customer,
-            "relationship_kind": raw.relationship_kind_snapshot or "Customer",
+            "relationship_kind": row["relationship_kind"],
             "fee_percent": format(fee_percent, "f"),
+            "fee_status": invoicing.FEE_STATUS_CONFIGURED,
             "invoice_currency": invoice_currency,
             "page_assets": [],
             "accounts": {},
             "source_spend": defaultdict(Decimal),
         })
-        group["source_spend"][currency] += amount
-        group["accounts"][account.name] = account.account_name
-        if page_asset not in group["page_assets"]:
-            group["page_assets"].append(page_asset)
+        group["source_spend"][row["currency"]] += row["amount"]
+        if row["fee_status"] == invoicing.FEE_STATUS_UNCONFIGURED:
+            group["fee_status"] = invoicing.FEE_STATUS_UNCONFIGURED
+        group["accounts"][row["account"]] = row["account_name"]
+        if row["page_asset"] not in group["page_assets"]:
+            group["page_assets"].append(row["page_asset"])
     return groups, unreadable
+
+
+def _attribution_reconciliation(buckets, ad_totals, unreadable_count, truncated, complete):
+    """TRACK B — the attribution reconciliation.
+
+    ─── WHAT THIS COMPARES ──────────────────────────────────────────────────────
+
+    Total ad-level delivery spend, against the six states that spend can be in.
+
+    ─── WHY THE SIX STATES, AND NOT THREE ───────────────────────────────────────
+
+    The six states are a PARTITION of the ad spend, and the partition is the
+    claim: every euro of ad-level delivery spend lands in exactly one of
+    them, and the difference between the two sides is the money that did not.
+
+    A three-way partition — assigned, unassigned, ambiguous — would put a
+    switched-off arrangement and a blocked charge in the same "assigned"
+    figure, and the report would go back to treating a decision and a defect
+    as the same money. The partition has to be the one the screens show.
+
+    ─── WHY IT IS A SELF-CHECK AND NOT A SUM ─────────────────────────────────────
+
+    Every ad row that can be read lands in a page group and in the ad total,
+    so the difference is structurally zero today. That is the POINT: it is the
+    check that stays zero. The failure it catches is a row that is read and
+    then goes NOWHERE — dropped, or counted twice — and no table shows that,
+    because a table only shows what survived.
+
+    ─── WHY "INCOMPLETE" IS A SEPARATE ANSWER ───────────────────────────────────
+
+    A row that could not be read has an UNKNOWN amount, so it moves neither
+    side of the comparison and the difference stays zero. The reconciliation
+    would then say "reconciled" about a period whose spend it cannot fully
+    state.
+
+    So an unreadable row makes the answer INCOMPLETE, not reconciled: the
+    arithmetic is clean and the coverage is not. Reporting "reconciled" here
+    would be a figure the reader could trust too far.
+    """
+    currencies = sorted(set(ad_totals) | {currency for bucket in buckets.values() for currency in bucket})
+    difference = {}
+    for currency in currencies:
+        placed = sum((buckets[state].get(currency, Decimal(0)) for state in chargeability.CHARGEABILITY_STATES), Decimal(0))
+        difference[currency] = ad_totals.get(currency, Decimal(0)) - placed
+
+    has_difference = any(value != 0 for value in difference.values())
+    if truncated or not complete:
+        status = "Unavailable"
+    elif unreadable_count:
+        status = "Incomplete"
+    elif has_difference:
+        status = "Difference"
+    else:
+        status = "Reconciled"
+
+    return {
+        "status": status,
+        "ad_spend": {currency: format(amount, "f") for currency, amount in sorted(ad_totals.items())},
+        "difference": {
+            currency: format(amount, "f")
+            for currency, amount in sorted(difference.items())
+            if amount != 0
+        },
+        "unreadable_rows": unreadable_count,
+        "truncated": truncated,
+        "buckets": {
+            state: {currency: format(amount, "f") for currency, amount in sorted(buckets[state].items())}
+            for state in chargeability.CHARGEABILITY_STATES
+        },
+    }
 
 
 @frappe.whitelist(methods=["GET"])
@@ -949,8 +1441,8 @@ def get_page_spend_report(company, since, until, account_name=None):
             continue
         try:
             amount = _decimal(raw.amount)
-            currency = _currency_code(raw.currency)
-            if amount < 0 or currency != account.currency:
+            currency = _stored_currency_code(raw.currency)
+            if amount < 0 or not currency or currency != account.currency:
                 raise ValueError("Stored account spend is invalid.")
             account_daily[account.name][str(raw.spend_date)] += amount
             account_totals.setdefault(account.name, {"currency": currency, "amount": Decimal(0)})["amount"] += amount
@@ -966,8 +1458,8 @@ def get_page_spend_report(company, since, until, account_name=None):
             continue
         try:
             amount = _decimal(raw.amount)
-            currency = _currency_code(raw.currency)
-            if amount < 0 or currency != account.currency or not raw.ad_id:
+            currency = _stored_currency_code(raw.currency)
+            if amount < 0 or not currency or currency != account.currency or not raw.ad_id:
                 raise ValueError("Stored ad spend is invalid.")
             ad_daily[account.name][str(raw.spend_date)] += amount
             asset = _read_attributed_page(raw)
@@ -991,8 +1483,11 @@ def get_page_spend_report(company, since, until, account_name=None):
                     "spend": Decimal(0),
                     "campaign_count": 0,
                     "ad_count": 0,
+                    "daily_spend": defaultdict(Decimal),
                 }
             page_groups[page_key]["spend"] += amount
+            if attribution_status != "Attributed":
+                page_groups[page_key]["daily_spend"][str(raw.spend_date)] += amount
             campaign_key = "|".join((page_key, raw.campaign_id or "", currency))
             if campaign_key not in campaign_groups:
                 campaign_groups[campaign_key] = {
@@ -1004,8 +1499,11 @@ def get_page_spend_report(company, since, until, account_name=None):
                     "currency": currency,
                     "spend": Decimal(0),
                     "ad_ids": set(),
+                    "daily_spend": defaultdict(Decimal),
                 }
             campaign_groups[campaign_key]["spend"] += amount
+            if attribution_status != "Attributed":
+                campaign_groups[campaign_key]["daily_spend"][str(raw.spend_date)] += amount
             if raw.ad_id:
                 campaign_groups[campaign_key]["ad_ids"].add(raw.ad_id)
                 ad_ids_by_group[page_key].add(raw.ad_id)
@@ -1059,14 +1557,72 @@ def get_page_spend_report(company, since, until, account_name=None):
         })
 
     complete = all_accounts_ready and not rows_truncated and unreadable_count == 0
+    # The Pages of the SWITCHED-OFF arrangements. Their spend is assigned —
+    # the payer is named — and deliberately not charged, so it must not land
+    # in the unassigned bucket beside spend nobody has mapped.
+    non_billable_assets = _non_billable_page_assets(company_name) if ad_rows else []
+    # The ad-level delivery total, per currency, BEFORE any of it is placed.
+    ad_totals = defaultdict(Decimal)
+    for account in account_by_name.values():
+        for amount in ad_daily.get(account.name, {}).values():
+            ad_totals[account.currency] += amount
+    # The six buckets, accumulated while the spend is still an exact Decimal.
+    chargeability_buckets = {
+        state: defaultdict(Decimal) for state in chargeability.CHARGEABILITY_STATES
+    }
     pages = []
     for page in page_groups.values():
+        switched_off_asset = None
+        if page["attribution_status"] != chargeability.ATTRIBUTION_STATUS_ATTRIBUTED:
+            switched_off_asset = _match_saved_page(
+                {
+                    "page_id": page.get("page_id") or "",
+                    "instagram_actor_id": page.get("instagram_account_id") or "",
+                },
+                non_billable_assets,
+            )
+        state, reason = chargeability.classify_chargeability({
+            "attribution_status": page["attribution_status"],
+            "switched_off": switched_off_asset is not None,
+        })
+        page["chargeability"] = state
+        page["chargeability_reason"] = reason
+        chargeability_buckets[state][page["currency"]] += page["spend"]
         page["spend"] = format(page["spend"], "f")
+        daily_spend = page.pop("daily_spend", {})
+        page["daily_spend"] = [
+            {
+                "spend_date": spend_date,
+                "spend": format(amount, "f"),
+                "currency": page["currency"],
+            }
+            for spend_date, amount in sorted(daily_spend.items())
+        ] if page["attribution_status"] != "Attributed" else []
+        # A switched-off arrangement still NAMES its customer, so the reader
+        # can see whose spend it is and why it is not being charged.
+        profile = (switched_off_asset or {}).get("_billing_profile") or {}
+        page["chargeability_customer"] = profile.get("customer_name") or ""
+        page["chargeability_profile"] = profile.get("name") or ""
         pages.append(page)
     campaigns = []
     for campaign in campaign_groups.values():
         campaign["spend"] = format(campaign["spend"], "f")
         campaign["ad_count"] = len(campaign.pop("ad_ids"))
+        daily_spend = campaign.pop("daily_spend", {})
+        campaign["daily_spend"] = [
+            {
+                "spend_date": spend_date,
+                "spend": format(amount, "f"),
+                "currency": campaign["currency"],
+            }
+            for spend_date, amount in sorted(daily_spend.items())
+        ] if page_groups[campaign["page_key"]]["attribution_status"] != "Attributed" else []
+        # A campaign belongs to a Page, so it inherits the Page's state. A
+        # campaign that reported a state of its own would be able to disagree
+        # with the Page it sits under.
+        parent_page = page_groups[campaign["page_key"]]
+        campaign["chargeability"] = parent_page["chargeability"]
+        campaign["chargeability_reason"] = parent_page["chargeability_reason"]
         campaigns.append(campaign)
     return {
         "company": company_name,
@@ -1076,6 +1632,14 @@ def get_page_spend_report(company, since, until, account_name=None):
         "truncated": accounts_truncated or runs_truncated or rows_truncated,
         "unreadable_count": unreadable_count,
         "accounts": reconciliation,
+        # TRACK B — the attribution reconciliation, against the six states.
+        "attribution_reconciliation": _attribution_reconciliation(
+            chargeability_buckets,
+            ad_totals,
+            unreadable_count,
+            accounts_truncated or runs_truncated or rows_truncated,
+            all_accounts_ready,
+        ),
         "pages": sorted(pages, key=lambda row: (row["page_name"].casefold(), row["account_name"].casefold(), row["currency"])),
         "campaigns": sorted(campaigns, key=lambda row: (row["campaign_name"].casefold(), row["account"], row["currency"])),
         "source_label": META_SOURCE,
@@ -1304,6 +1868,77 @@ def _page_id_from_story_id(value):
     return match.group(1) if match else ""
 
 
+def _match_saved_page(identity, page_assets):
+    """Match a STORED Page identity against a set of saved assets.
+
+    The same rules `_attribute_ad_page` applies, without the creative-story
+    prefix — because a stored row's `page_id` already carries the RESOLVED
+    identity, and the row's status already carries the conflict verdict.
+
+    A conflict is NOT a match. Two assets claiming the same Page is a decision
+    a human has to make, and this helper will not make it by picking one.
+    """
+    page_id = (identity or {}).get("page_id") or ""
+    instagram_id = (identity or {}).get("instagram_actor_id") or ""
+    page_matches = [asset for asset in page_assets if page_id and asset.get("page_id") == page_id]
+    instagram_matches = [
+        asset for asset in page_assets
+        if instagram_id and asset.get("instagram_account_id") == instagram_id
+    ]
+    if len(page_matches) > 1 or len(instagram_matches) > 1:
+        return None
+    if page_matches and instagram_matches and page_matches[0] != instagram_matches[0]:
+        return None
+    if page_matches:
+        return page_matches[0]
+    if instagram_matches and not page_id:
+        return instagram_matches[0]
+    return None
+
+
+def _collect_non_billable_spend(ad_rows, account_by_name, run_by_account, non_billable_assets):
+    """The spend of ads whose Page belongs to a SWITCHED-OFF arrangement.
+
+    These rows are not charged — that is what "disabled" means — and they are
+    not unassigned either: the Page is known, and a payer is named. They are
+    reported in their OWN bucket, so the two are never added together and
+    never read as one number.
+
+    Only rows the sync stored as UNMAPPED are considered. A row that matched an
+    enabled profile was charged, and a row that was ambiguous needs a human
+    decision — neither is a switched-off arrangement, and neither may be moved
+    into this bucket.
+    """
+    totals = defaultdict(Decimal)
+    matched_pages = set()
+    for raw in ad_rows:
+        account = account_by_name.get(raw.ad_account)
+        run = run_by_account.get(raw.ad_account)
+        if (
+            not account or not run or raw.level != "Ad" or raw.sync_run != run.name or
+            raw.external_account_id != account.external_account_id
+        ):
+            continue
+        if (raw.attribution_status or "Unmapped") != "Unmapped":
+            continue
+        try:
+            amount = _decimal(raw.amount)
+            currency = _stored_currency_code(raw.currency)
+            if amount < 0 or not currency or currency != account.currency or not raw.ad_id:
+                raise ValueError("Stored ad spend is invalid.")
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        asset = _match_saved_page(
+            {"page_id": raw.page_id, "instagram_actor_id": raw.instagram_actor_id},
+            non_billable_assets,
+        )
+        if not asset:
+            continue
+        totals[currency] += amount
+        matched_pages.add((raw.ad_account, raw.page_id or raw.instagram_actor_id or ""))
+    return totals, matched_pages
+
+
 def _reconcile_ad_spend(account_daily, ad_rows, currency):
     precision = _currency_precision(currency)
     if precision is None:
@@ -1431,15 +2066,32 @@ def _parse_fee_rules(value):
     return sorted(normalized, key=lambda rule: rule["effective_from"])
 
 
-def _fee_percent_for_date(profile, on_date):
-    """Use the latest fee rule effective on the spend date, or the base fee."""
+def _fee_status_for_date(profile, on_date):
+    """The fee for a spend date, AND whether anybody ever stated it.
+
+    Returns (status, percent_text). The status is `configured` when a fee was
+    written down — by a dated rule, or by a standing fee that is not zero, or
+    by the profile's explicit `fee_is_configured` flag — and `unconfigured`
+    when nobody said what the fee is.
+
+    WHY THE STATUS IS SNAPSHOTTED, NOT READ BACK LATER
+    --------------------------------------------------
+
+    The percent alone cannot tell an APPROVED ZERO from NO FEE AT ALL, and the
+    distinction has to survive the profile being edited later. So the sync
+    records the STATUS on the spend row, next to the percent it applied, and
+    the invoice reads that snapshot. A profile whose fee is changed tomorrow
+    must not change what yesterday's spend was invoiced at.
+
+    See `meta_ads_invoicing.resolve_fee` for the rule itself.
+    """
     if not profile:
-        return "0"
+        return invoicing.FEE_STATUS_UNCONFIGURED, "0"
     try:
         target_date = getdate(on_date)
     except Exception as error:
         raise ValueError("Spend date is invalid for fee-rule lookup.") from error
-    applicable = []
+    rules = []
     seen_dates = set()
     for rule in profile.get("fee_rules") or []:
         try:
@@ -1452,11 +2104,20 @@ def _fee_percent_for_date(profile, on_date):
         if effective_date in seen_dates:
             raise ValueError("Stored fee rules contain a duplicate effective date.")
         seen_dates.add(effective_date)
-        if effective_date <= target_date:
-            applicable.append((effective_date, fee))
-    if applicable:
-        return format(max(applicable, key=lambda item: item[0])[1], "f")
-    return _decimal_text(profile.get("fee_percent") or "0")
+        rules.append({"effective_from": effective_date, "fee_percent": fee})
+    status, percent, _source = invoicing.resolve_fee(
+        rules,
+        profile.get("fee_percent") or "0",
+        bool(profile.get("fee_is_configured")),
+        target_date,
+    )
+    return status, format(percent, "f")
+
+
+def _fee_percent_for_date(profile, on_date):
+    """Use the latest fee rule effective on the spend date, or the base fee."""
+    _status, percent = _fee_status_for_date(profile, on_date)
+    return percent
 
 
 def _snapshot_page_assets(value):
@@ -1478,11 +2139,49 @@ def _snapshot_page_assets(value):
     ]
 
 
+def _profile_policies(company_name, profile_names):
+    """The POLICY each named profile runs under, keyed by profile name.
+
+    Only the fields that answer a policy question are read. Everything else
+    about the profile — the fee, the Page assets — is already on the spend
+    snapshot, and reading it again here would be a second answer to the same
+    question.
+    """
+    names = [name for name in (profile_names or set()) if name]
+    if not names:
+        return {}
+    rows = frappe.get_all(
+        "LaraTik Meta Ads Billing Profile",
+        filters={"name": ["in", names]},
+        fields=[
+            "name", "fee_is_configured", "charge_model", "recognition_model",
+            "income_account", "invoice_item", "tax_treatment", "tax_template",
+        ],
+        limit_page_length=len(names) + 1,
+    )
+    return {
+        row.name: {
+            "fee_is_configured": bool(row.fee_is_configured),
+            "charge_model": row.charge_model or "",
+            "recognition_model": row.recognition_model or "",
+            "income_account": row.income_account or "",
+            "invoice_item": row.invoice_item or "",
+            "tax_treatment": row.tax_treatment or "",
+            "tax_template": row.tax_template or "",
+        }
+        for row in rows
+    }
+
+
 def _profile_payloads(company_name):
     profiles = frappe.get_all(
         "LaraTik Meta Ads Billing Profile",
         filters={"company": company_name},
-        fields=["name", "customer", "relationship_kind", "fee_percent", "invoice_currency", "disabled"],
+        fields=[
+            "name", "customer", "relationship_kind", "fee_percent", "invoice_currency",
+            "disabled", "fee_is_configured", "charge_model", "recognition_model",
+            "income_account", "invoice_item", "tax_treatment", "tax_template",
+        ],
         order_by="modified desc",
         limit_page_length=MAX_BILLING_PROFILES + 1,
     )
@@ -1500,6 +2199,85 @@ def _page_profile_assets(profiles):
     return assets
 
 
+def _non_billable_page_assets(company_name):
+    """The Page assets of the SWITCHED-OFF payer arrangements.
+
+    ─── WHY A DISABLED PROFILE'S PAGES ARE STILL KNOWN ───────────────────────────
+
+    A disabled profile is an ADMINISTRATIVE DECISION: this payer arrangement is
+    switched off, so its Pages are not charged. It is NOT a statement that
+    nobody owns those Pages.
+
+    Before, the disabled profile's assets were dropped from the asset list
+    entirely, so its spend came back as UNASSIGNED — the same bucket as spend
+    whose Page nobody has ever mapped. Those two are not the same thing: one
+    is a decision, the other is a gap, and the brief is explicit that they must
+    not be treated as financially equivalent.
+
+    So the assets are kept, marked, and reported as "assigned but not
+    billable" — with the customer named, so the reader can see whose spend it
+    is and WHY it is not being charged.
+
+    The read is deliberately cheap and narrow: the DISABLED profiles only, and
+    their Page assets. It does not load the whole profile set, because this
+    runs on every report read and a report does not need the fee schedules.
+
+    It is THREE queries, not one per profile. A report that reads a hundred
+    disabled arrangements must not issue two hundred queries to say what is
+    switched off, so the profiles, their Page assets and their customer names
+    are each fetched once.
+    """
+    profiles = frappe.get_all(
+        "LaraTik Meta Ads Billing Profile",
+        filters={"company": company_name, "disabled": 1},
+        fields=["name", "customer"],
+        order_by="name asc",
+        limit_page_length=MAX_BILLING_PROFILES + 1,
+    )
+    profiles = profiles[:MAX_BILLING_PROFILES]
+    if not profiles:
+        return []
+
+    customer_names = {}
+    customer_ids = sorted({profile.customer for profile in profiles if profile.customer})
+    if customer_ids:
+        for row in frappe.get_all(
+            "Customer",
+            filters={"name": ["in", customer_ids]},
+            fields=["name", "customer_name"],
+            limit_page_length=len(customer_ids),
+        ):
+            customer_names[row.name] = row.customer_name or row.name
+
+    assets = []
+    profile_by_name = {profile.name: profile for profile in profiles}
+    for asset in frappe.get_all(
+        "LaraTik Meta Ads Page Asset",
+        filters={
+            "parent": ["in", list(profile_by_name)],
+            "parenttype": "LaraTik Meta Ads Billing Profile",
+        },
+        fields=[
+            "parent", "page_id", "page_name", "instagram_account_id", "instagram_username",
+            "served_customer",
+        ],
+        limit_page_length=MAX_BILLING_PROFILES * 20,
+    ):
+        profile = profile_by_name.get(asset.parent)
+        if not profile:
+            continue
+        customer = profile.customer or ""
+        assets.append({
+            **asset,
+            "_billing_profile": {
+                "name": profile.name,
+                "customer": customer,
+                "customer_name": customer_names.get(customer) or customer,
+            },
+        })
+    return assets
+
+
 def _profile_payload(profile_row):
     profile = frappe.get_doc("LaraTik Meta Ads Billing Profile", profile_row.name)
     profile.check_permission("read")
@@ -1510,6 +2288,21 @@ def _profile_payload(profile_row):
         "customer_name": customer_name or profile.customer or "",
         "relationship_kind": profile.relationship_kind or "Customer",
         "fee_percent": _decimal_text(profile.fee_percent or "0"),
+        # THE POLICY ANSWERS. Each one is a decision somebody has to make, and
+        # each one is UNSET by default — the app never picks one. An unset
+        # field is "not decided", which blocks the draft and leaves the
+        # workspace and the preview fully usable.
+        #
+        # `fee_is_configured` is a NUMBER, not a boolean, because the form
+        # holds a Check, and the web app reads the flag the way a Check reads:
+        # 1 or 0.
+        "fee_is_configured": int(bool(profile.fee_is_configured)),
+        "charge_model": profile.charge_model or "",
+        "recognition_model": profile.recognition_model or "",
+        "income_account": profile.income_account or "",
+        "invoice_item": profile.invoice_item or "",
+        "tax_treatment": profile.tax_treatment or "",
+        "tax_template": profile.tax_template or "",
         "fee_rules": [{
             "effective_from": str(row.effective_from),
             "fee_percent": _decimal_text(row.fee_percent or "0"),
@@ -1645,6 +2438,37 @@ def _currency_code(value):
     return code
 
 
+def _stored_currency_code(value):
+    """The currency code of a value that was VALIDATED WHEN IT WAS SAVED.
+
+    ─── WHY A STORED VALUE IS READ DIFFERENTLY ──────────────────────────────────
+
+    `_currency_code` THROWS for a currency ERPNext does not recognise. That is
+    right for a value that has just arrived from Meta — it is a fresh input and
+    a fresh input should be refused loudly.
+
+    It is wrong for a value being READ BACK. Every read path reads a stored
+    snapshot inside a `try` that catches `ValueError`, `TypeError` and
+    `InvalidOperation` — and Frappe's own validation error is none of those,
+    so a snapshot whose currency has since been disabled took the whole report
+    down with a 500 instead of being counted as an unreadable row.
+
+    And a stored snapshot with NO billing currency at all — a payer
+    arrangement that never had one — is not an error either. It is a charge
+    that cannot be invoiced yet, and the honest answer is a BLOCKED line the
+    reader can act on, not a dead screen.
+
+    So a stored currency is read TOLERANTLY, and the caller decides what an
+    unusable one means.
+    """
+    code = str(value or "").strip().upper()
+    if not re.fullmatch(r"[A-Z]{3}", code):
+        return ""
+    if not frappe.db.exists("Currency", code):
+        return ""
+    return code
+
+
 def _text(value, label, maximum):
     if value is None:
         return ""
@@ -1654,6 +2478,43 @@ def _text(value, label, maximum):
     if len(result) > maximum:
         frappe.throw(f"{label} is too long.")
     return result
+
+
+def _policy_choice(value, label, vocabulary):
+    """The reader's answer to ONE policy question, or None for "not answered".
+
+    ─── WHY THIS IS THREE STATES AND NOT TWO ───────────────────────────────────
+
+    `None` means the caller did not answer this question at all, and the
+    stored answer must not change. `""` means the reader chose "not decided",
+    which CLEARS the answer. A value outside `vocabulary` is refused.
+
+    The distinction is the difference between "leave my other answers alone"
+    and "take this one back", and a caller that cannot tell them apart cannot
+    offer the reader either.
+    """
+    if value is None:
+        return None
+    answer = _text(value, label, 60)
+    if not answer:
+        return ""
+    if answer not in vocabulary:
+        frappe.throw(f"Choose a {label.lower()} from the list.")
+    return answer
+
+
+def _check_flag(value):
+    """A Check field's answer: 1, 0, True or False — and nothing else."""
+    if isinstance(value, bool):
+        return 1 if value else 0
+    if isinstance(value, int) and value in (0, 1):
+        return value
+    text = _text(value, "Fee flag", 8).casefold()
+    if text in ("1", "true", "yes", "on"):
+        return 1
+    if text in ("", "0", "false", "no", "off"):
+        return 0
+    frappe.throw("The fee flag must be true or false.")
 
 
 def _decimal(value):

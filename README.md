@@ -86,7 +86,7 @@ bench --site <site> backup
 
 ## What it installs
 
-Nineteen DocTypes, in dependency order:
+Twenty-one DocTypes, in dependency order:
 
 | DocType | What it is |
 |---|---|
@@ -109,6 +109,8 @@ Nineteen DocTypes, in dependency order:
 | `LaraTik Meta Ads Sync` | the date range and result of each account sync |
 | `LaraTik Meta Ads Payment Import` | an immutable import batch for Meta billing CSV evidence |
 | `LaraTik Meta Ads Payment` | an immutable account-level Meta payment or credit row |
+| `LaraTik Meta Ads Invoice Batch` | one customer invoice draft's scope: period, snapshots, totals, and the ERPNext Sales Invoice it points at |
+| `LaraTik Meta Ads Invoice Line` | one chargeable line of an invoice batch: advertising cost, fee, currency conversion, and its source |
 
 ---
 

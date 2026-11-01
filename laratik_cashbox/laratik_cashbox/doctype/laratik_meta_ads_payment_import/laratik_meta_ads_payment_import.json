@@ -5,7 +5,7 @@
  "creation": "2026-10-27 00:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": ["company", "ad_account", "external_account_id", "billing_profile_snapshot", "billing_customer_snapshot", "relationship_kind_snapshot", "fee_percent_snapshot", "invoice_currency_snapshot", "page_assets_snapshot", "report_start_date", "report_end_date", "currency", "source", "source_sha256", "source_file", "status", "report_row_count", "inserted_row_count", "duplicate_row_count", "payment_count", "refund_count", "credit_count", "unclassified_count", "payment_total", "refund_total", "credit_total", "unclassified_total", "imported_at", "imported_by"],
+ "field_order": ["company", "ad_account", "external_account_id", "billing_profile_snapshot", "billing_customer_snapshot", "relationship_kind_snapshot", "fee_percent_snapshot", "invoice_currency_snapshot", "page_assets_snapshot", "report_start_date", "report_end_date", "currency", "source", "source_sha256", "source_file", "status", "report_row_count", "inserted_row_count", "duplicate_row_count", "payment_count", "refund_count", "credit_count", "reversal_count", "unclassified_count", "payment_total", "refund_total", "credit_total", "reversal_total", "unclassified_total", "imported_at", "imported_by"],
  "fields": [
   {"fieldname": "company", "fieldtype": "Link", "in_list_view": 1, "label": "Company", "options": "Company", "read_only": 1, "reqd": 1},
   {"fieldname": "ad_account", "fieldtype": "Link", "in_list_view": 1, "label": "Meta Ad Account", "options": "LaraTik Meta Ads Account", "read_only": 1, "reqd": 1},
@@ -29,10 +29,12 @@
   {"fieldname": "payment_count", "fieldtype": "Int", "label": "Cash Payment Rows", "read_only": 1},
   {"fieldname": "refund_count", "fieldtype": "Int", "label": "Refund Rows", "read_only": 1},
   {"fieldname": "credit_count", "fieldtype": "Int", "label": "Ad Credit Rows", "read_only": 1},
+  {"fieldname": "reversal_count", "fieldtype": "Int", "label": "Reversal Rows", "read_only": 1},
   {"fieldname": "unclassified_count", "fieldtype": "Int", "label": "Unclassified Rows", "read_only": 1},
   {"fieldname": "payment_total", "fieldtype": "Data", "label": "Cash Payment Total", "read_only": 1},
   {"fieldname": "refund_total", "fieldtype": "Data", "label": "Refund Total", "read_only": 1},
   {"fieldname": "credit_total", "fieldtype": "Data", "label": "Ad Credit Total", "read_only": 1},
+  {"fieldname": "reversal_total", "fieldtype": "Data", "label": "Reversal Total", "read_only": 1},
   {"fieldname": "unclassified_total", "fieldtype": "Data", "label": "Unclassified Total", "read_only": 1},
   {"fieldname": "imported_at", "fieldtype": "Datetime", "in_list_view": 1, "label": "Imported At", "read_only": 1, "reqd": 1},
   {"fieldname": "imported_by", "fieldtype": "Link", "label": "Imported By", "options": "User", "read_only": 1, "reqd": 1}

@@ -1,0 +1,204 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-11-02 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "billing_profile",
+  "billing_customer",
+  "relationship_kind",
+  "period_start",
+  "period_end",
+  "invoice_currency",
+  "charge_model_snapshot",
+  "recognition_model_snapshot",
+  "fee_percent_snapshot",
+  "tax_treatment_snapshot",
+  "tax_template_snapshot",
+  "income_account_snapshot",
+  "invoice_item_snapshot",
+  "status",
+  "sales_invoice",
+  "status_synced_at",
+  "basis_total",
+  "fee_total",
+  "total",
+  "source_sync",
+  "source_hash",
+  "created_at",
+  "created_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "billing_profile",
+   "fieldtype": "Link",
+   "label": "Billing Profile",
+   "options": "LaraTik Meta Ads Billing Profile"
+  },
+  {
+   "fieldname": "billing_customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Billed Customer",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "relationship_kind",
+   "fieldtype": "Data",
+   "label": "Relationship Snapshot"
+  },
+  {
+   "fieldname": "period_start",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Period Start",
+   "reqd": 1
+  },
+  {
+   "fieldname": "period_end",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Period End",
+   "reqd": 1
+  },
+  {
+   "fieldname": "invoice_currency",
+   "fieldtype": "Link",
+   "label": "Invoice Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "charge_model_snapshot",
+   "fieldtype": "Data",
+   "label": "Charge Model Snapshot"
+  },
+  {
+   "fieldname": "recognition_model_snapshot",
+   "fieldtype": "Data",
+   "label": "Recognition Model Snapshot"
+  },
+  {
+   "fieldname": "fee_percent_snapshot",
+   "fieldtype": "Data",
+   "label": "Service Fee Percent Snapshot"
+  },
+  {
+   "fieldname": "tax_treatment_snapshot",
+   "fieldtype": "Data",
+   "label": "Tax Treatment Snapshot"
+  },
+  {
+   "fieldname": "tax_template_snapshot",
+   "fieldtype": "Link",
+   "label": "Tax Template Snapshot",
+   "options": "Sales Taxes and Charges Template"
+  },
+  {
+   "fieldname": "income_account_snapshot",
+   "fieldtype": "Link",
+   "label": "Income Account Snapshot",
+   "options": "Account"
+  },
+  {
+   "fieldname": "invoice_item_snapshot",
+   "fieldtype": "Link",
+   "label": "Invoice Item Snapshot",
+   "options": "Item"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "ERPNext Status",
+   "options": "Draft\nSubmitted\nCancelled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "ERPNext Sales Invoice",
+   "options": "Sales Invoice"
+  },
+  {
+   "fieldname": "status_synced_at",
+   "fieldtype": "Datetime",
+   "label": "Status Read From ERPNext At"
+  },
+  {
+   "fieldname": "basis_total",
+   "fieldtype": "Data",
+   "label": "Advertising Cost Total"
+  },
+  {
+   "fieldname": "fee_total",
+   "fieldtype": "Data",
+   "label": "Service Fee Total"
+  },
+  {
+   "fieldname": "total",
+   "fieldtype": "Data",
+   "label": "Invoice Total"
+  },
+  {
+   "fieldname": "source_sync",
+   "fieldtype": "Data",
+   "label": "Source Sync Run"
+  },
+  {
+   "fieldname": "source_hash",
+   "fieldtype": "Data",
+   "label": "Chargeable Figures Hash"
+  },
+  {
+   "fieldname": "created_at",
+   "fieldtype": "Datetime",
+   "label": "Created At",
+   "reqd": 1
+  },
+  {
+   "fieldname": "created_by",
+   "fieldtype": "Link",
+   "label": "Created By",
+   "options": "User"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LaraTik Cashbox",
+ "name": "LaraTik Meta Ads Invoice Batch",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "System Manager",
+   "share": 0,
+   "write": 0,
+   "amend": 0,
+   "cancel": 0,
+   "submit": 0
+  }
+ ],
+ "sort_field": "created_at",
+ "sort_order": "DESC"
+}

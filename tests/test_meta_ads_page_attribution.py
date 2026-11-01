@@ -105,6 +105,7 @@ def ad_spend_row(status, amount="10.00", snapshot=None, profile="Example profile
         billing_customer_snapshot="Example Customer",
         relationship_kind_snapshot="Customer",
         fee_percent_snapshot="0",
+        fee_status_snapshot="unconfigured",
         invoice_currency_snapshot="USD",
         page_id=page_id,
         instagram_actor_id="17841400000000001",
@@ -192,6 +193,18 @@ def test_page_asset_mapping_retains_the_payer_profile(meta_api):
     assert result["asset"]["_billing_profile"] == profile
 
 
+def billable_groups(meta_api, rows, account_by_name, run_by_account):
+    """The billable groups of a set of ad rows.
+
+    The billable path is TWO steps now — decide which rows may be charged,
+    then group them — because the customer invoice workspace reads the same
+    decision. These tests go through both steps, so they keep testing the
+    behaviour rather than a private function's shape.
+    """
+    billable, unreadable = meta_api._billable_ad_rows(rows, account_by_name, run_by_account)
+    return meta_api._collect_ad_billable_groups(billable, unreadable)
+
+
 def test_only_page_matched_ad_cost_is_added_to_customer_charge_group(meta_api, monkeypatch):
     monkeypatch.setattr(meta_api.frappe.db, "get_value", lambda doctype, name, field: name)
     account_by_name, run_by_account = account_and_run()
@@ -200,7 +213,7 @@ def test_only_page_matched_ad_cost_is_added_to_customer_charge_group(meta_api, m
         ad_spend_row("Unmapped", "87.66", snapshot="", profile=""),
     ]
 
-    groups, unreadable = meta_api._collect_ad_billable_groups(rows, account_by_name, run_by_account)
+    groups, unreadable = billable_groups(meta_api, rows, account_by_name, run_by_account)
 
     assert unreadable == 0
     assert len(groups) == 1
@@ -212,7 +225,7 @@ def test_account_level_total_cannot_enter_a_customer_charge_group(meta_api):
     row = ad_spend_row("Attributed", "100.00")
     row.level = "Account"
 
-    groups, unreadable = meta_api._collect_ad_billable_groups([row], account_by_name, run_by_account)
+    groups, unreadable = billable_groups(meta_api, [row], account_by_name, run_by_account)
 
     assert groups == {}
     assert unreadable == 1
@@ -227,7 +240,8 @@ def test_duplicate_page_assets_are_ambiguous_and_not_billable(meta_api, monkeypa
         "instagram_actor_id": "17841400000000001",
     }, mapped_assets)
     account_by_name, run_by_account = account_and_run()
-    groups, unreadable = meta_api._collect_ad_billable_groups(
+    groups, unreadable = billable_groups(
+        meta_api,
         [ad_spend_row(attribution["status"], "99.00", snapshot="", profile="")],
         account_by_name,
         run_by_account,
@@ -241,7 +255,8 @@ def test_duplicate_page_assets_are_ambiguous_and_not_billable(meta_api, monkeypa
 def test_attributed_ad_with_malformed_page_snapshot_withholds_billing(meta_api):
     account_by_name, run_by_account = account_and_run()
 
-    groups, unreadable = meta_api._collect_ad_billable_groups(
+    groups, unreadable = billable_groups(
+        meta_api,
         [ad_spend_row("Attributed", "10.00", snapshot="not-json")],
         account_by_name,
         run_by_account,
