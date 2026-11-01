@@ -354,6 +354,25 @@ def _seed(state, disabled_profile=True):
 # ─── THE SPEND REPORT ──────────────────────────────────────────────────────────
 
 
+def test_the_selected_account_spend_report_uses_the_resolved_account(site):
+    api, state = site
+    _seed(state)
+
+    report = api.get_spend_report(
+        COMPANY, "2026-10-01", "2026-10-02", account_name=ACCOUNT
+    )
+
+    assert [account["name"] for account in report["accounts"]] == [ACCOUNT]
+    assert report["spend_by_currency"] == {"EUR": "200.00"}
+    account_spend_queries = [
+        filters
+        for doctype, filters in state.queries
+        if doctype == "LaraTik Meta Ads Spend" and filters.get("level") == "Account"
+    ]
+    assert len(account_spend_queries) == 1
+    assert account_spend_queries[0]["ad_account"] == ACCOUNT
+
+
 def test_the_switched_off_spend_leaves_the_unassigned_bucket(site):
     api, state = site
     _seed(state)

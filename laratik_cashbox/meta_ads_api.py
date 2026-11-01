@@ -841,7 +841,7 @@ def get_spend_report(company, since, until, account_name=None):
                 "level": "Account",
                 "spend_date": ["between", [start.isoformat(), end.isoformat()]],
                 "sync_run": ["in", selected_run_names],
-                **({"ad_account": selected.name} if account_name else {}),
+                **({"ad_account": period["selected_account_name"]} if account_name else {}),
             },
             fields=[
                 "name", "sync_run", "ad_account", "external_account_id", "billing_profile", "spend_date",

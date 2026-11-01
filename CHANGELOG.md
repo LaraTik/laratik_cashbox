@@ -20,6 +20,22 @@ only re-verify their schema.
 
 ---
 
+## 0.1.16 — 2026-11-01
+
+The selected-account Meta spend report now filters with the account resolved
+by the shared period reader. This fixes a server error that prevented the
+account and daily report from loading when an ad account was selected.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.16`.
+
+---
+
 ## 0.1.15 — 2026-11-01
 
 Meta Ads billing now has an auditable customer-invoice workflow. It records a
