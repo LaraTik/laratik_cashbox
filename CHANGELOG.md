@@ -20,6 +20,62 @@ only re-verify their schema.
 
 ---
 
+## 0.1.19 — 2026-11-02
+
+The Customer Invoices screen now distinguishes a truly empty period from
+spend that is withheld because account or Page data is incomplete or has not
+reconciled. Customer totals use the same withheld state and direct readers to
+Attribution for the account details.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.19`.
+
+---
+
+## 0.1.18 — 2026-11-02
+
+The Meta Ads workspace now states that its shared sync timestamp covers
+account-level Insights only. Page and campaign completeness remains visible
+in each report, so a successful account fetch is not mistaken for a complete
+customer attribution report.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.18`.
+
+---
+
+## 0.1.17 — 2026-11-02
+
+The Meta Ads finance workspace now uses the shared table component across its
+reports and billing tools. Its overview clarifies multi-currency figures,
+shows the unassigned share only when a single currency makes the comparison
+meaningful, withholds customer allocation until all selected account costs
+reconcile, and localizes the reasons a figure is withheld. Report controls
+also have clearer keyboard focus and larger hit areas. The Overview states
+the account spend once, brings its reconciliation warning next to the figures,
+and distinguishes a true empty customer period from amounts withheld pending
+reconciliation.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.17`.
+
+---
+
 ## 0.1.16 — 2026-11-01
 
 The selected-account Meta spend report now filters with the account resolved
