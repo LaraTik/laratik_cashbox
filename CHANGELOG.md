@@ -20,6 +20,20 @@ only re-verify their schema.
 
 ---
 
+## 0.1.27 — 2026-11-02
+
+Settings now keep the selected account page or billing group open after an
+account mapping, Page mapping, fee schedule, or accounting policy save. Policy
+success and error messages are displayed in English and Arabic.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.27`.
+
 ## 0.1.26 — 2026-11-02
 
 Meta Ads billing groups now show their linked ad-account and Page counts, and
