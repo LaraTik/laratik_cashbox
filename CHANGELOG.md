@@ -20,6 +20,21 @@ only re-verify their schema.
 
 ---
 
+## 0.1.28 — 2026-11-02
+
+The invoice workspace now explains that the service fee is already calculated
+when a USD estimate is unavailable, names the missing EUR-to-USD selling rate,
+and points to ERPNext Currency Exchange for the next step. The charge breakdown
+labels a missing rate directly instead of showing only “Unavailable”.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.28`.
+
 ## 0.1.27 — 2026-11-02
 
 Settings now keep the selected account page or billing group open after an
