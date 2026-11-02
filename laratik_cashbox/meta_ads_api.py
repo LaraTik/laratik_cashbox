@@ -310,8 +310,8 @@ def save_billing_profile(company, customer, relationship_kind, fee_percent, invo
 
 
 @frappe.whitelist(methods=["POST"])
-def save_billing_fee_rules(company, profile_name, fee_rules):
-    """Replace a profile's effective-dated fee schedule without changing its Pages."""
+def save_billing_fee_rules(company, profile_name, fee_rules, fee_percent=None):
+    """Replace a profile's fee schedule without changing its Pages or policy."""
     _require_admin()
     company_name = _company_name(company)
     profile = frappe.get_doc("LaraTik Meta Ads Billing Profile", _text(profile_name, "Billing profile", 140))
@@ -320,6 +320,17 @@ def save_billing_fee_rules(company, profile_name, fee_rules):
         frappe.throw("The billing profile belongs to another Company.")
 
     normalized_fee_rules = _parse_fee_rules(fee_rules)
+    normalized_base_fee = None
+    if fee_percent is not None:
+        try:
+            normalized_base_fee = Decimal(str(fee_percent))
+        except (InvalidOperation, TypeError, ValueError):
+            frappe.throw("Enter a valid service fee percentage.")
+        if not normalized_base_fee.is_finite() or normalized_base_fee < 0 or normalized_base_fee > 100:
+            frappe.throw("Service fee must be between 0% and 100%.")
+
+    if normalized_base_fee is not None:
+        profile.fee_percent = format(normalized_base_fee, "f")
     profile.set("fee_rules", [])
     for rule in normalized_fee_rules:
         profile.append("fee_rules", rule)

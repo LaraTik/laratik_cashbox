@@ -26,6 +26,7 @@ from __future__ import annotations
 import importlib
 import sys
 import types
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -50,6 +51,8 @@ class FakeProfile:
         self.invoice_item = ""
         self.tax_treatment = ""
         self.tax_template = ""
+        self.fee_percent = "15"
+        self.fee_rules = []
         self.fee_is_configured = 0
         self.saved = 0
         self.deny_write = False
@@ -61,6 +64,12 @@ class FakeProfile:
     def save(self):
         self.saved += 1
         return self
+
+    def set(self, field: str, value):
+        setattr(self, field, value)
+
+    def append(self, field: str, value):
+        getattr(self, field).append(SimpleNamespace(**value))
 
 
 @pytest.fixture
@@ -130,7 +139,7 @@ def policy_api(monkeypatch):
     fake.get_all = lambda *_args, **_kwargs: []
 
     utils = types.ModuleType("frappe.utils")
-    utils.getdate = lambda value: value
+    utils.getdate = lambda value: date.fromisoformat(str(value)[:10])
     utils.now_datetime = lambda: None
     requests = types.ModuleType("requests")
     requests.RequestException = RuntimeError
@@ -179,6 +188,65 @@ def test_an_admin_can_save_a_valid_policy_and_the_profile_carries_it(policy_api)
     assert result["profile"] == "PROFILE-1"
     assert result["charge_model"] == "Recharge"
     assert result["fee_is_configured"] == 1
+
+
+def test_an_admin_can_update_the_base_fee_and_dated_schedule_together(policy_api):
+    api, state = policy_api
+
+    result = api.save_billing_fee_rules(
+        "Example GmbH",
+        "PROFILE-1",
+        [{"effective_from": "2026-11-01", "fee_percent": "20"}],
+        fee_percent="15.5",
+    )
+
+    profile = state["profile"]
+    assert profile.fee_percent == "15.5"
+    assert [(rule.effective_from, rule.fee_percent) for rule in profile.fee_rules] == [
+        ("2026-11-01", "20")
+    ]
+    assert profile.saved == 1
+    assert result == {"profile": "PROFILE-1", "fee_rule_count": 1}
+
+
+def test_a_rules_only_update_keeps_the_existing_base_fee(policy_api):
+    api, state = policy_api
+
+    api.save_billing_fee_rules(
+        "Example GmbH",
+        "PROFILE-1",
+        [{"effective_from": "2026-11-01", "fee_percent": "20"}],
+    )
+
+    assert state["profile"].fee_percent == "15"
+    assert state["profile"].fee_rules[0].fee_percent == "20"
+
+
+def test_zero_base_fee_can_be_saved_without_marking_it_approved(policy_api):
+    api, state = policy_api
+
+    api.save_billing_fee_rules("Example GmbH", "PROFILE-1", [], fee_percent="0")
+
+    assert state["profile"].fee_percent == "0"
+    assert state["profile"].fee_is_configured == 0
+
+
+@pytest.mark.parametrize("fee_percent", ["-0.01", "100.01", "NaN", "not-a-rate"])
+def test_invalid_base_fee_does_not_change_the_fee_schedule(policy_api, fee_percent):
+    api, state = policy_api
+    original_rules = state["profile"].fee_rules.copy()
+
+    with pytest.raises(Refusal, match="fee|percentage"):
+        api.save_billing_fee_rules(
+            "Example GmbH",
+            "PROFILE-1",
+            [{"effective_from": "2026-11-01", "fee_percent": "20"}],
+            fee_percent=fee_percent,
+        )
+
+    assert state["profile"].fee_percent == "15"
+    assert state["profile"].fee_rules == original_rules
+    assert state["profile"].saved == 0
 
 
 def test_a_value_outside_the_vocabulary_is_refused(policy_api):

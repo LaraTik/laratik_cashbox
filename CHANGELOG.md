@@ -20,6 +20,24 @@ only re-verify their schema.
 
 ---
 
+## 0.1.26 — 2026-11-02
+
+Meta Ads billing groups now show their linked ad-account and Page counts, and
+admins can edit the base percentage alongside effective-dated fee changes.
+The saved-spend snapshots remain unchanged by later fee edits. Existing and
+newly created Sales Invoices can be opened directly in ERPNext Desk, and the
+Meta Ads invoice workspace is refreshed after invoice drafts or billing
+imports.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.26`.
+
+## 0.1.25 — 2026-11-02
 ## 0.1.25 — 2026-11-02
 
 The Meta Ads workspace now formats its reporting period and last-sync date in
