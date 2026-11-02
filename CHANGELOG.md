@@ -20,6 +20,20 @@ only re-verify their schema.
 
 ---
 
+## 0.1.25 — 2026-11-02
+
+The Meta Ads workspace now formats its reporting period and last-sync date in
+the selected locale, and translates the account sync status into English or
+Arabic. The stored dates and URL filters remain ISO-formatted.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.25`.
+
 ## 0.1.24 — 2026-11-02
 
 Invoice readiness now distinguishes spend whose payer cannot be identified
