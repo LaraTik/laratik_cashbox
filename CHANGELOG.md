@@ -20,6 +20,25 @@ only re-verify their schema.
 
 ---
 
+## 0.1.23 — 2026-11-02
+
+The Page attribution report now adds a paginated spend rollup by the explicit
+`Customer served` Page mapping. It follows the selected date, ad account and
+payer filters; keeps currencies separate; and shows Pages with no recorded
+customer in their own review row. Incomplete reports withhold the rollup.
+These delivery totals are not invoice amounts and do not assign customers.
+The labels are available in English and Arabic.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.23`.
+
+---
+
 ## 0.1.22 — 2026-11-02
 
 The Page attribution report now makes an unset `Customer served` value
