@@ -20,6 +20,23 @@ only re-verify their schema.
 
 ---
 
+## 0.1.22 — 2026-11-02
+
+The Page attribution report now makes an unset `Customer served` value
+explicit, explains how it differs from the billing payer, and gives
+administrators a direct path to Page mapping settings. It does not infer or
+change customer assignments. The new copy is available in English and Arabic.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.22`.
+
+---
+
 ## 0.1.21 — 2026-11-02
 
 When Meta returns an external account ID in place of a readable account name,
