@@ -20,6 +20,23 @@ only re-verify their schema.
 
 ---
 
+## 0.1.21 — 2026-11-02
+
+When Meta returns an external account ID in place of a readable account name,
+the account selector, daily spend rows, Page attribution, and delivery
+reconciliation now label it as an unnamed ad account while keeping the ID
+visible. The label is localized in English and Arabic.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.21`.
+
+---
+
 ## 0.1.20 — 2026-11-02
 
 Attribution now shows account-level totals for each readable account when a
