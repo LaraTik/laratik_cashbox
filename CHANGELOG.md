@@ -20,6 +20,21 @@ only re-verify their schema.
 
 ---
 
+## 0.1.24 — 2026-11-02
+
+Invoice readiness now distinguishes spend whose payer cannot be identified
+from attributed spend that is blocked by missing billing data such as an
+exchange rate. This prevents a known customer charge from being mislabeled as
+unattributed while preserving the actual reason the invoice is unavailable.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.24`.
+
 ## 0.1.23 — 2026-11-02
 
 The Page attribution report now adds a paginated spend rollup by the explicit

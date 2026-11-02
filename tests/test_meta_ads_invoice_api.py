@@ -566,6 +566,18 @@ def test_a_missing_exchange_rate_blocks_the_period(site):
     assert row["invoice_amount"] is None
 
 
+def test_a_missing_exchange_rate_is_not_reported_as_unattributed(site):
+    api, state = site
+    _seed(state)
+    state.tables["Currency Exchange"] = []
+
+    row = _row(api, state)
+
+    assert row["readiness"] == "blocked"
+    assert "exchange_rate_missing" in row["readiness_reasons"]
+    assert "spend_not_attributable" not in row["readiness_reasons"]
+
+
 def test_an_undecided_tax_treatment_holds_the_draft(site):
     api, state = site
     _seed(state, tax_treatment="")

@@ -102,6 +102,7 @@ from decimal import Decimal, InvalidOperation
 import frappe
 from frappe.utils import getdate, now_datetime
 
+from laratik_cashbox import meta_ads_chargeability as chargeability
 from laratik_cashbox import meta_ads_invoicing as invoicing
 from laratik_cashbox import outstanding_policy
 from laratik_cashbox.meta_ads_api import (
@@ -693,7 +694,13 @@ def _readiness_reasons(
     approval_reasons = []
     blocked_reasons = []
 
-    if group.get("chargeability") != "assigned_billable":
+    # A blocked group can still be fully attributed: for example, its only
+    # blocker may be a missing currency rate. Preserve the source distinction
+    # between unknown payer and a known payer whose invoice data is incomplete.
+    if group.get("chargeability") in {
+        chargeability.CHARGEABILITY_UNASSIGNED,
+        chargeability.CHARGEABILITY_AMBIGUOUS,
+    }:
         blocked_reasons.append(invoicing.BLOCKED_REASON_SPEND_NOT_ATTRIBUTABLE)
     if missing_rate:
         blocked_reasons.append(invoicing.BLOCKED_REASON_EXCHANGE_RATE_MISSING)
