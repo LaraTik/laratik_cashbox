@@ -20,6 +20,24 @@ only re-verify their schema.
 
 ---
 
+## 0.1.20 — 2026-11-02
+
+Attribution now shows account-level totals for each readable account when a
+different account has incomplete ad-level data. Ad totals and differences
+remain unavailable for accounts whose ad read did not complete. Withheld
+customer charges now link directly to account reconciliation while keeping the
+selected reporting period and account.
+
+### Patches
+
+- None. This release changes no schema.
+
+### Changed
+
+- The web app and Frappe app both carry version `0.1.20`.
+
+---
+
 ## 0.1.19 — 2026-11-02
 
 The Customer Invoices screen now distinguishes a truly empty period from
